@@ -124,7 +124,7 @@ export function App() {
         setSortByDistance(true);
         setLocating(false);
       },
-      () => setLocating(false),
+      () => { setLocating(false); alert('定位失敗，請確認已開啟定位服務'); },
       { enableHighAccuracy: true, timeout: 10000 },
     );
   }, [userLocation]);
