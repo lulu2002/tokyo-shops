@@ -12,8 +12,8 @@ import { ListPicker } from './ListPicker';
 import { isOpenAt, toJST } from '../utils/openStatus';
 import { haversine } from '../utils/distance';
 import {
-  fetchShops, fetchCategories, fetchMyLists, createList, deleteList,
-  fetchListShopIds, addToList, removeFromList, fetchShopListMap,
+  fetchShops, fetchCategories, fetchMyLists, createList, updateList, deleteList,
+  fetchListShopIds, addToList, removeFromList, fetchShopListMap, fetchListById,
 } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import type { Category } from '../lib/api';
@@ -48,6 +48,7 @@ export function App() {
   // Lists
   const [myLists, setMyLists] = useState<List[]>([]);
   const [activeListId, setActiveListId] = useState<string | null>(null);
+  const [activeList, setActiveList] = useState<List | null>(null);
   const [listShopIds, setListShopIds] = useState<Set<number>>(new Set());
   const [shopListMap, setShopListMap] = useState<Map<number, { listId: string; listName: string }[]>>(new Map());
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -82,11 +83,18 @@ export function App() {
     fetchShopListMap(user.id).then(setShopListMap).catch(console.error);
   }, [user]);
 
-  // Load list items when active list changes
+  // Load list items + list info when active list changes
   useEffect(() => {
-    if (!activeListId) { setListShopIds(new Set()); return; }
+    if (!activeListId) { setListShopIds(new Set()); setActiveList(null); return; }
     fetchListShopIds(activeListId).then(setListShopIds).catch(console.error);
-  }, [activeListId]);
+    // Check if it's my list first, otherwise fetch from DB
+    const myList = myLists.find((l) => l.id === activeListId);
+    if (myList) {
+      setActiveList(myList);
+    } else {
+      fetchListById(activeListId).then(setActiveList).catch(() => setActiveList(null));
+    }
+  }, [activeListId, myLists]);
 
   // Hash change
   useEffect(() => {
@@ -119,8 +127,13 @@ export function App() {
   const handleDeleteList = useCallback(async (listId: string) => {
     await deleteList(listId);
     setMyLists((prev) => prev.filter((l) => l.id !== listId));
-    if (activeListId === listId) setActiveListId(null);
+    if (activeListId === listId) { setActiveListId(null); window.location.hash = ''; }
   }, [activeListId]);
+
+  const handleTogglePublic = useCallback(async (listId: string, isPublic: boolean) => {
+    await updateList(listId, { is_public: isPublic });
+    setMyLists((prev) => prev.map((l) => l.id === listId ? { ...l, isPublic } : l));
+  }, []);
 
   const handleSelectList = useCallback((listId: string) => {
     setActiveListId(listId);
@@ -235,8 +248,6 @@ export function App() {
     window.scrollTo({ top: 0 });
   }, [categories, activeListId]);
 
-  const activeList = myLists.find((l) => l.id === activeListId);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -315,6 +326,7 @@ export function App() {
           onSelectList={handleSelectList}
           onCreate={handleCreateList}
           onDelete={handleDeleteList}
+          onTogglePublic={handleTogglePublic}
           onClose={() => setDrawerOpen(false)}
           loggedIn={!!user}
           onSignIn={signInWithGoogle}

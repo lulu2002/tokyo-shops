@@ -7,14 +7,16 @@ interface Props {
   onSelectList: (listId: string) => void;
   onCreate: (name: string) => void;
   onDelete: (listId: string) => void;
+  onTogglePublic: (listId: string, isPublic: boolean) => void;
   onClose: () => void;
   loggedIn: boolean;
   onSignIn: () => void;
 }
 
-export function ListDrawer({ lists, activeListId, onSelectList, onCreate, onDelete, onClose, loggedIn, onSignIn }: Props) {
+export function ListDrawer({ lists, activeListId, onSelectList, onCreate, onDelete, onTogglePublic, onClose, loggedIn, onSignIn }: Props) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  const [copied, setCopied] = useState<string | null>(null);
 
   const handleCreate = () => {
     const name = newName.trim();
@@ -22,6 +24,14 @@ export function ListDrawer({ lists, activeListId, onSelectList, onCreate, onDele
     onCreate(name);
     setNewName('');
     setCreating(false);
+  };
+
+  const handleShare = (list: List) => {
+    const url = `${window.location.origin}${window.location.pathname}#list:${list.id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(list.id);
+      setTimeout(() => setCopied(null), 2000);
+    });
   };
 
   return (
@@ -54,22 +64,49 @@ export function ListDrawer({ lists, activeListId, onSelectList, onCreate, onDele
               )}
 
               {lists.map((list) => (
-                <div key={list.id} className="flex items-center group">
-                  <button
-                    onClick={() => { onSelectList(list.id); onClose(); }}
-                    className={`flex-1 flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
-                      activeListId === list.id ? 'bg-rose-50' : ''
-                    }`}
-                  >
-                    <span className="text-sm font-medium text-gray-700">{list.name}</span>
-                    <span className="text-xs text-gray-400 ml-auto">{list.itemCount || 0} 間</span>
-                  </button>
-                  <button
-                    onClick={() => { if (confirm(`刪除「${list.name}」？`)) onDelete(list.id); }}
-                    className="px-3 py-3 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    🗑
-                  </button>
+                <div key={list.id} className="border-b border-gray-50">
+                  {/* Main row */}
+                  <div className="flex items-center">
+                    <button
+                      onClick={() => { onSelectList(list.id); onClose(); }}
+                      className={`flex-1 flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
+                        activeListId === list.id ? 'bg-rose-50' : ''
+                      }`}
+                    >
+                      <span className="text-sm font-medium text-gray-700">{list.name}</span>
+                      {list.isPublic && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-100 text-green-700">公開</span>
+                      )}
+                      <span className="text-xs text-gray-400 ml-auto">{list.itemCount || 0} 間</span>
+                    </button>
+                  </div>
+                  {/* Actions row */}
+                  <div className="flex items-center gap-1 px-4 pb-2">
+                    <button
+                      onClick={() => onTogglePublic(list.id, !list.isPublic)}
+                      className={`px-2 py-1 rounded text-xs transition-colors ${
+                        list.isPublic
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >
+                      {list.isPublic ? '🌐 公開' : '🔒 私人'}
+                    </button>
+                    {list.isPublic && (
+                      <button
+                        onClick={() => handleShare(list)}
+                        className="px-2 py-1 rounded text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                      >
+                        {copied === list.id ? '✓ 已複製' : '🔗 複製連結'}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { if (confirm(`刪除「${list.name}」？`)) onDelete(list.id); }}
+                      className="px-2 py-1 rounded text-xs text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors ml-auto"
+                    >
+                      刪除
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

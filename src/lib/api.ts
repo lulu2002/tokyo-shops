@@ -123,9 +123,34 @@ export async function createList(userId: string, name: string, color = 'bg-rose-
   };
 }
 
+export async function updateList(listId: string, updates: { name?: string; is_public?: boolean }): Promise<void> {
+  const { error } = await supabase.from('lists').update(updates).eq('id', listId);
+  if (error) throw error;
+}
+
 export async function deleteList(listId: string): Promise<void> {
   const { error } = await supabase.from('lists').delete().eq('id', listId);
   if (error) throw error;
+}
+
+export async function fetchListById(listId: string): Promise<List | null> {
+  const { data, error } = await supabase
+    .from('lists')
+    .select('*, list_items(count)')
+    .eq('id', listId)
+    .single();
+
+  if (error || !data) return null;
+  return {
+    id: data.id,
+    userId: data.user_id,
+    name: data.name,
+    color: data.color,
+    isPublic: data.is_public,
+    sortOrder: data.sort_order,
+    createdAt: data.created_at,
+    itemCount: ((data.list_items as { count: number }[])?.[0]?.count) || 0,
+  };
 }
 
 export async function fetchListShopIds(listId: string): Promise<Set<number>> {
