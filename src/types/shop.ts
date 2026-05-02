@@ -2,6 +2,7 @@ export interface Shop {
   id: number;
   name: string;
   category: string;
+  categories: string[];
   subcategory: string;
   specialty: string;
   description: string;

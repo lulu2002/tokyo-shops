@@ -50,7 +50,9 @@ export function App() {
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const s of shops) {
-      map[s.category] = (map[s.category] || 0) + 1;
+      for (const cat of s.categories) {
+        map[cat] = (map[cat] || 0) + 1;
+      }
     }
     return map;
   }, []);
@@ -79,7 +81,7 @@ export function App() {
   const filtered = useMemo(() => {
     let result = shops;
     if (activeCategory) {
-      result = result.filter((s) => s.category === activeCategory);
+      result = result.filter((s) => s.categories.includes(activeCategory));
     }
     if (showOnlyOpen) {
       result = result.filter((s) => openStatusMap.get(s.id) === true);
@@ -99,7 +101,7 @@ export function App() {
 
   const openCount = useMemo(() => {
     const currentFiltered = activeCategory
-      ? shops.filter((s) => s.category === activeCategory)
+      ? shops.filter((s) => s.categories.includes(activeCategory))
       : shops;
     return currentFiltered.filter((s) => openStatusMap.get(s.id) === true).length;
   }, [activeCategory, openStatusMap]);
