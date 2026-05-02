@@ -69,6 +69,23 @@ function mapShop(db: DbShop): Shop {
   };
 }
 
+// ============================================
+// Admin
+// ============================================
+
+export async function checkIsAdmin(userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('admin_users')
+    .select('user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return !!data;
+}
+
+// ============================================
+// Shops
+// ============================================
+
 export async function fetchShops(): Promise<Shop[]> {
   const { data, error } = await supabase
     .from('shops')

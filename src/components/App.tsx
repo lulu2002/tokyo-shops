@@ -8,6 +8,7 @@ import { TimeBar } from './TimeBar';
 import { UserMenu } from './UserMenu';
 import { ListDrawer } from './ListDrawer';
 import { ListTagBar } from './ListTagBar';
+import { ImportModal } from './ImportModal';
 import { ListPicker } from './ListPicker';
 import { isOpenAt, toJST } from '../utils/openStatus';
 import { haversine } from '../utils/distance';
@@ -24,7 +25,8 @@ interface UserLocation {
 }
 
 export function App() {
-  const { user, signInWithGoogle, signOut } = useAuth();
+  const { user, isAdmin, signInWithGoogle, signOut } = useAuth();
+  const [importOpen, setImportOpen] = useState(false);
 
   // Data
   const [shops, setShops] = useState<Shop[]>([]);
@@ -250,6 +252,16 @@ export function App() {
     return scope.filter((s) => openStatusMap.get(s.id) === true).length;
   }, [baseShops, activeCategory, openStatusMap]);
 
+  const categoryMap = useMemo(() => {
+    return new Map(categories.map((c) => [c.name, c.id]));
+  }, [categories]);
+
+  const handleImportDone = useCallback(() => {
+    setImportOpen(false);
+    // Reload shops
+    fetchShops().then(setShops);
+  }, []);
+
   const handleTimeChange = useCallback((d: Date) => setCheckTime(d), []);
 
   const handleLocate = useCallback(() => {
@@ -289,7 +301,17 @@ export function App() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">東京專門店地圖</h1>
             <p className="text-sm text-gray-500 mt-1">98 個領域 · {shops.length} 間店</p>
           </div>
-          <UserMenu user={user} onSignIn={signInWithGoogle} onSignOut={signOut} onOpenLists={() => setDrawerOpen(true)} hasPublicLists={publicLists.length > 0} />
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => setImportOpen(true)}
+                className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium hover:bg-blue-100 transition-colors"
+              >
+                + 匯入
+              </button>
+            )}
+            <UserMenu user={user} onSignIn={signInWithGoogle} onSignOut={signOut} onOpenLists={() => setDrawerOpen(true)} hasPublicLists={publicLists.length > 0} />
+          </div>
         </div>
       </header>
 
@@ -372,6 +394,15 @@ export function App() {
           onToggle={handleToggleListItem}
           onCreate={handleCreateList}
           onClose={() => setPickerShopId(null)}
+        />
+      )}
+
+      {importOpen && (
+        <ImportModal
+          categories={categories}
+          categoryMap={categoryMap}
+          onClose={() => setImportOpen(false)}
+          onDone={handleImportDone}
         />
       )}
     </div>

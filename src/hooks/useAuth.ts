@@ -1,19 +1,26 @@
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { checkIsAdmin } from '../lib/api';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) checkIsAdmin(u.id).then(setIsAdmin);
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      setUser(u);
+      if (u) checkIsAdmin(u.id).then(setIsAdmin);
+      else setIsAdmin(false);
     });
 
     return () => subscription.unsubscribe();
@@ -30,5 +37,5 @@ export function useAuth() {
     await supabase.auth.signOut();
   };
 
-  return { user, loading, signInWithGoogle, signOut };
+  return { user, isAdmin, loading, signInWithGoogle, signOut };
 }
