@@ -48,7 +48,7 @@ export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]' }: Props)
         className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
       >
         {photos.map((url, i) => (
-          <div key={i} className={`snap-center shrink-0 w-full ${aspect} bg-gray-100`}>
+          <div key={i} className={`snap-center shrink-0 w-full ${aspect} bg-gray-100`} style={{ scrollSnapStop: 'always' }}>
             {Math.abs(i - idx) <= 1 || i === 0 ? (
               <img
                 src={url}
