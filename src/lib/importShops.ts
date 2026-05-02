@@ -1,8 +1,8 @@
 import { supabase } from './supabase';
 
-const GOOGLE_API_KEY = 'AIzaSyCGOypP8wdgdvKuq-T0VDS6rvn9wOCfGi8';
+const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || '';
 const SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
-const SUPABASE_URL = 'https://vzoynvmrggvnvnammdlh.supabase.co';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 
 export interface ImportPreview {
   name: string;
