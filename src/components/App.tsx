@@ -47,10 +47,18 @@ export function App() {
     });
   }, []);
 
+  const matchesCategory = useCallback((s: Shop, cat: string) => {
+    return s.category === cat || (s.tags?.includes('eva想逛') && cat === 'Eva 想逛');
+  }, []);
+
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const s of shops) {
       map[s.category] = (map[s.category] || 0) + 1;
+      // Also count in Eva 想逛 if tagged
+      if (s.tags?.includes('eva想逛') && s.category !== 'Eva 想逛') {
+        map['Eva 想逛'] = (map['Eva 想逛'] || 0) + 1;
+      }
     }
     return map;
   }, []);
@@ -79,7 +87,7 @@ export function App() {
   const filtered = useMemo(() => {
     let result = shops;
     if (activeCategory) {
-      result = result.filter((s) => s.category === activeCategory);
+      result = result.filter((s) => matchesCategory(s, activeCategory));
     }
     if (showOnlyOpen) {
       result = result.filter((s) => openStatusMap.get(s.id) === true);
@@ -99,7 +107,7 @@ export function App() {
 
   const openCount = useMemo(() => {
     const currentFiltered = activeCategory
-      ? shops.filter((s) => s.category === activeCategory)
+      ? shops.filter((s) => matchesCategory(s, activeCategory))
       : shops;
     return currentFiltered.filter((s) => openStatusMap.get(s.id) === true).length;
   }, [activeCategory, openStatusMap]);

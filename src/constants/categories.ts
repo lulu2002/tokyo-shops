@@ -9,6 +9,7 @@ export const CATEGORIES = [
   { key: '運動・戶外', label: '運動戶外', color: 'bg-orange-500' },
   { key: '書店・藝文・旅行', label: '書店藝文', color: 'bg-indigo-500' },
   { key: '米食文化', label: '米食文化', color: 'bg-yellow-600' },
+  { key: 'Eva 想逛', label: 'Eva 想逛', color: 'bg-rose-500' },
 ] as const;
 
 export type CategoryKey = (typeof CATEGORIES)[number]['key'];

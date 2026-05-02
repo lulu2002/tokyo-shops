@@ -22,4 +22,5 @@ export interface Shop {
   editorial?: string;
   reviewText?: string;
   hours?: string[];
+  tags?: string[];
 }
