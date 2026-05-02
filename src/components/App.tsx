@@ -7,13 +7,13 @@ import { ShopDetail } from './ShopDetail';
 import { TimeBar } from './TimeBar';
 import { UserMenu } from './UserMenu';
 import { ListDrawer } from './ListDrawer';
-import { ListFilterBar } from './ListFilterBar';
+import { ListTagBar } from './ListTagBar';
 import { ListPicker } from './ListPicker';
 import { isOpenAt, toJST } from '../utils/openStatus';
 import { haversine } from '../utils/distance';
 import {
   fetchShops, fetchCategories, fetchMyLists, fetchPublicLists, createList, updateList, deleteList,
-  fetchListShopIds, addToList, removeFromList, fetchShopListMap, fetchListById,
+  fetchListShopIds, addToList, removeFromList, fetchShopListMap,
 } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import type { Category } from '../lib/api';
@@ -160,10 +160,6 @@ export function App() {
     });
   }, []);
 
-  const handleClearListFilter = useCallback(() => {
-    setActiveListIds([]);
-    window.location.hash = '';
-  }, []);
 
   const handleToggleListItem = useCallback(async (listId: string, add: boolean) => {
     if (!pickerShopId || !user) return;
@@ -311,12 +307,12 @@ export function App() {
         onToggleSortDistance={() => setSortByDistance((v) => !v)}
       />
 
-      {listFilterActive && (
-        <ListFilterBar
+      {(user || publicLists.length > 0) && (
+        <ListTagBar
           activeListIds={activeListIds}
           allLists={[...myLists, ...publicLists]}
-          count={filtered.length}
-          onClear={handleClearListFilter}
+          onToggleList={handleToggleList}
+          onOpenDrawer={() => setDrawerOpen(true)}
         />
       )}
 
