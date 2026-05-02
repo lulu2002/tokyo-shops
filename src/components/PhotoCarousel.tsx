@@ -58,6 +58,7 @@ function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
       isHorizontal: false,
     };
     setDragging(true);
+    setDragOffset(0);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
@@ -76,10 +77,11 @@ function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
 
     if (!t.isHorizontal) return;
 
-    // Resist at edges
-    let offset = dx;
-    if ((idx === 0 && dx > 0) || (idx === photos.length - 1 && dx < 0)) {
-      offset = dx * 0.3;
+    // Clamp drag to roughly 1 card width, resist at edges
+    const maxDrag = 200;
+    let offset = Math.max(-maxDrag, Math.min(maxDrag, dx));
+    if ((idx === 0 && offset > 0) || (idx === photos.length - 1 && offset < 0)) {
+      offset = offset * 0.3;
     }
     setDragOffset(offset);
   };
@@ -88,7 +90,7 @@ function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
     const t = touchRef.current;
     if (!t) return;
 
-    if (t.isHorizontal && Math.abs(dragOffset) > 50) {
+    if (t.isHorizontal && Math.abs(dragOffset) > 40) {
       if (dragOffset < 0 && idx < photos.length - 1) goTo(idx + 1);
       else if (dragOffset > 0 && idx > 0) goTo(idx - 1);
       else setDragOffset(0);
