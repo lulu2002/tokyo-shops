@@ -4,9 +4,11 @@ import { CategoryTabs } from './CategoryTabs';
 import { ShopGrid } from './ShopGrid';
 import { ShopDetail } from './ShopDetail';
 import { TimeBar } from './TimeBar';
+import { UserMenu } from './UserMenu';
 import { isOpenAt, toJST } from '../utils/openStatus';
 import { haversine } from '../utils/distance';
 import { fetchShops, fetchCategories } from '../lib/api';
+import { useAuth } from '../hooks/useAuth';
 import type { Category } from '../lib/api';
 
 interface UserLocation {
@@ -15,6 +17,7 @@ interface UserLocation {
 }
 
 export function App() {
+  const { user, signInWithGoogle, signOut } = useAuth();
   const [shops, setShops] = useState<Shop[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,13 +171,16 @@ export function App() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            東京專門店地圖
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            98 個領域 · {shops.length} 間店
-          </p>
+        <div className="max-w-7xl mx-auto px-4 py-6 flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              東京專門店地圖
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              98 個領域 · {shops.length} 間店
+            </p>
+          </div>
+          <UserMenu user={user} onSignIn={signInWithGoogle} onSignOut={signOut} />
         </div>
       </header>
 
