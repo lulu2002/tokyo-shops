@@ -34,8 +34,7 @@ export function App() {
 
   // Load data from Supabase
   useEffect(() => {
-    const base = import.meta.env.BASE_URL;
-    Promise.all([fetchShops(base), fetchCategories()])
+    Promise.all([fetchShops(), fetchCategories()])
       .then(([s, c]) => {
         setShops(s);
         setCategories(c);

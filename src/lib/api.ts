@@ -41,8 +41,7 @@ export interface Category {
   sortOrder: number;
 }
 
-function mapShop(db: DbShop, base: string): Shop {
-  const resolveImg = (p: string) => (p ? `${base}${p.replace(/^\//, '')}` : '');
+function mapShop(db: DbShop): Shop {
   return {
     id: db.id,
     name: db.name,
@@ -57,8 +56,8 @@ function mapShop(db: DbShop, base: string): Shop {
     price: db.price,
     lat: db.lat,
     lng: db.lng,
-    photoUrl: resolveImg(db.photo_url),
-    photos: db.photos?.map(resolveImg).filter(Boolean) || [],
+    photoUrl: db.photo_url,
+    photos: db.photos?.filter(Boolean) || [],
     slug: db.slug,
     rating: db.rating,
     reviewCount: db.review_count,
@@ -69,14 +68,14 @@ function mapShop(db: DbShop, base: string): Shop {
   };
 }
 
-export async function fetchShops(base: string): Promise<Shop[]> {
+export async function fetchShops(): Promise<Shop[]> {
   const { data, error } = await supabase
     .from('shops')
     .select('*, shop_categories(categories(id, slug, name, label, color))')
     .order('id');
 
   if (error) throw error;
-  return (data as DbShop[]).map((s) => mapShop(s, base));
+  return (data as DbShop[]).map(mapShop);
 }
 
 export async function fetchCategories(): Promise<Category[]> {
