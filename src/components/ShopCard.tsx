@@ -28,16 +28,9 @@ export function ShopCard({ shop, onSelect, isOpen, distance }: Props) {
         ) : (
           <div className="aspect-[16/10] bg-gray-100" />
         )}
-        <div className="absolute top-2 left-2 z-10 flex gap-1 flex-wrap">
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium text-white ${catColor}`}>
-            {shop.subcategory}
-          </span>
-          {shop.tags?.map((tag) => (
-            <span key={tag} className="px-2 py-0.5 rounded-full text-xs font-medium bg-rose-500 text-white">
-              {tag}
-            </span>
-          ))}
-        </div>
+        <span className={`absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-xs font-medium text-white ${catColor}`}>
+          {shop.subcategory}
+        </span>
         <div className="absolute top-2 right-2 z-10 flex gap-1">
           {shop.rating ? (
             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-white/90 text-gray-700">
