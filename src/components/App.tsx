@@ -156,7 +156,7 @@ export function App() {
 
       <CategoryTabs
         activeCategory={activeCategory}
-        onSelect={setActiveCategory}
+        onSelect={(key) => { setActiveCategory(key); window.scrollTo({ top: 0 }); }}
         counts={counts}
         viewMode={viewMode}
         onViewModeChange={persistViewMode}
