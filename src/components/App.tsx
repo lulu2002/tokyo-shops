@@ -25,20 +25,24 @@ export function App() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [checkTime, setCheckTime] = useState(() => new Date());
-  const [showOnlyOpen, setShowOnlyOpen] = useState(() => localStorage.getItem('pref:showOnlyOpen') === 'true');
+  const [showOnlyOpen, setShowOnlyOpen] = useState(() => {
+    try { return localStorage.getItem('pref:showOnlyOpen') === 'true'; } catch { return false; }
+  });
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locating, setLocating] = useState(false);
   const [sortByDistance, setSortByDistance] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => (localStorage.getItem('pref:viewMode') as 'grid' | 'list') || 'grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    try { const v = localStorage.getItem('pref:viewMode'); return v === 'list' ? 'list' : 'grid'; } catch { return 'grid'; }
+  });
 
   const persistViewMode = useCallback((mode: 'grid' | 'list') => {
     setViewMode(mode);
-    localStorage.setItem('pref:viewMode', mode);
+    try { localStorage.setItem('pref:viewMode', mode); } catch {}
   }, []);
 
   const persistShowOnlyOpen = useCallback(() => {
     setShowOnlyOpen((v) => {
-      localStorage.setItem('pref:showOnlyOpen', String(!v));
+      try { localStorage.setItem('pref:showOnlyOpen', String(!v)); } catch {}
       return !v;
     });
   }, []);
