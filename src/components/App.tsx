@@ -48,16 +48,17 @@ export function App() {
   }, []);
 
   const matchesCategory = useCallback((s: Shop, cat: string) => {
-    return s.category === cat || (s.tags?.includes('eva想逛') && cat === 'Eva 想逛');
+    return s.category === cat || (s.tags?.includes(cat) === true);
   }, []);
 
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const s of shops) {
       map[s.category] = (map[s.category] || 0) + 1;
-      // Also count in Eva 想逛 if tagged
-      if (s.tags?.includes('eva想逛') && s.category !== 'Eva 想逛') {
-        map['Eva 想逛'] = (map['Eva 想逛'] || 0) + 1;
+      for (const tag of s.tags || []) {
+        if (tag !== s.category) {
+          map[tag] = (map[tag] || 0) + 1;
+        }
       }
     }
     return map;
