@@ -37,10 +37,41 @@ export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]', mode = '
     );
   }
 
-  // Light mode: single <img>, swap src on arrow click (for cards - minimal DOM)
+  // Light mode: single <img>, swap src on arrow/swipe (for cards - minimal DOM)
   if (mode === 'light') {
+    const touchStart = useRef<{ x: number; y: number } | null>(null);
+    const swiped = useRef(false);
+
+    const onTouchStart = (e: React.TouchEvent) => {
+      touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      swiped.current = false;
+    };
+    const onTouchMove = (e: React.TouchEvent) => {
+      if (!touchStart.current || swiped.current) return;
+      const dx = e.touches[0].clientX - touchStart.current.x;
+      const dy = e.touches[0].clientY - touchStart.current.y;
+      // Only handle horizontal swipe, ignore vertical scroll
+      if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy)) {
+        swiped.current = true;
+        if (dx > 0) prev();
+        else next();
+      }
+    };
+    const onTouchEnd = (e: React.TouchEvent) => {
+      if (swiped.current) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+      touchStart.current = null;
+    };
+
     return (
-      <div className="relative group">
+      <div
+        className="relative group"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         <div className={`${aspect} bg-gray-100 overflow-hidden`}>
           <img
             src={photos[idx]}
