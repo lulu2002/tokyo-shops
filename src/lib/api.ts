@@ -200,16 +200,28 @@ export async function removeFromList(listId: string, shopId: number): Promise<vo
 }
 
 export async function fetchShopListMap(userId: string): Promise<Map<number, { listId: string; listName: string }[]>> {
+  // First get user's list IDs, then get items for those lists
+  const { data: lists } = await supabase
+    .from('lists')
+    .select('id, name')
+    .eq('user_id', userId);
+
+  if (!lists || lists.length === 0) return new Map();
+
+  const listMap = new Map(lists.map((l) => [l.id as string, l.name as string]));
+  const listIds = lists.map((l) => l.id);
+
   const { data, error } = await supabase
     .from('list_items')
-    .select('shop_id, list_id, lists(name)')
-    .eq('lists.user_id', userId);
+    .select('shop_id, list_id')
+    .in('list_id', listIds);
 
   if (error) throw error;
   const map = new Map<number, { listId: string; listName: string }[]>();
   for (const row of data || []) {
     const shopId = row.shop_id as number;
-    const entry = { listId: row.list_id as string, listName: (row.lists as { name: string })?.name || '' };
+    const listId = row.list_id as string;
+    const entry = { listId, listName: listMap.get(listId) || '' };
     if (!map.has(shopId)) map.set(shopId, []);
     map.get(shopId)!.push(entry);
   }
