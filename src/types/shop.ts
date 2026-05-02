@@ -11,6 +11,7 @@ export interface Shop {
   lat: number;
   lng: number;
   photoUrl: string;
+  photos?: string[];
   slug: string;
   googleName?: string;
   rating?: number;

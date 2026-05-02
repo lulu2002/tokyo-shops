@@ -9,9 +9,11 @@ import { haversine } from '../utils/distance';
 import shopsData from '../data/shops.json';
 
 const base = import.meta.env.BASE_URL;
+const resolveImg = (p: string) => p ? `${base}${p.replace(/^\//, '')}` : '';
 const shops = (shopsData as Shop[]).map((s) => ({
   ...s,
-  photoUrl: s.photoUrl ? `${base}${s.photoUrl.replace(/^\//, '')}` : '',
+  photoUrl: resolveImg(s.photoUrl),
+  photos: s.photos?.map(resolveImg).filter(Boolean) || [],
 }));
 
 interface UserLocation {

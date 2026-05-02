@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { Shop } from '../types/shop';
 import { CATEGORIES } from '../constants/categories';
 import { formatDistanceLabel } from '../utils/distance';
@@ -14,6 +14,14 @@ export function ShopDetail({ shop, onClose, isOpen, distance }: Props) {
   const catColor = CATEGORIES.find((c) => c.key === shop.category)?.color || 'bg-gray-500';
   const mapsUrl = shop.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${shop.lat},${shop.lng}`;
   const summaryText = shop.description || '';
+  const photos = shop.photos?.length ? shop.photos : shop.photoUrl ? [shop.photoUrl] : [];
+  const [photoIdx, setPhotoIdx] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setPhotoIdx(0);
+    scrollRef.current?.scrollTo({ left: 0 });
+  }, [shop.id]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -26,6 +34,13 @@ export function ShopDetail({ shop, onClose, isOpen, distance }: Props) {
       window.removeEventListener('keydown', handleEsc);
     };
   }, [onClose]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    setPhotoIdx(idx);
+  };
 
   return (
     <div
@@ -44,15 +59,43 @@ export function ShopDetail({ shop, onClose, isOpen, distance }: Props) {
           ✕
         </button>
 
-        <div className="aspect-[16/10] bg-gray-100 overflow-hidden">
-          {shop.photoUrl ? (
-            <img src={shop.photoUrl} alt={shop.name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-200">
-              <span className="text-6xl opacity-30">🏪</span>
+        {/* Photo carousel */}
+        {photos.length > 0 ? (
+          <div className="relative">
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
+            >
+              {photos.map((url, i) => (
+                <div key={i} className="snap-center shrink-0 w-full aspect-[16/10] bg-gray-100">
+                  <img
+                    src={url}
+                    alt={`${shop.name} ${i + 1}`}
+                    className="w-full h-full object-cover"
+                    loading={i === 0 ? 'eager' : 'lazy'}
+                  />
+                </div>
+              ))}
             </div>
-          )}
-        </div>
+            {photos.length > 1 && (
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+                {photos.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                      i === photoIdx ? 'bg-white' : 'bg-white/40'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="aspect-[16/10] bg-gray-100 flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-200">
+            <span className="text-6xl opacity-30">🏪</span>
+          </div>
+        )}
 
         <div className="p-5">
           <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -82,8 +125,6 @@ export function ShopDetail({ shop, onClose, isOpen, distance }: Props) {
           {summaryText && (
             <p className="text-sm text-gray-500 leading-relaxed mb-4">{summaryText}</p>
           )}
-
-          {false}
 
           <div className="space-y-2 text-sm text-gray-600 mb-4">
             {distance !== undefined && (
