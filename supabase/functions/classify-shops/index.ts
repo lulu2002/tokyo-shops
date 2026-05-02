@@ -23,20 +23,7 @@ interface Classification {
   description: string;
 }
 
-const CATEGORIES = [
-  "3C・音樂・遊戲",
-  "文具・畫材・書寫",
-  "廚房・料理道具",
-  "食品・咖啡・茶酒",
-  "時尚・配件",
-  "手工藝・傳統工藝",
-  "生活雜貨・家居",
-  "運動・戶外",
-  "書店・藝文・旅行",
-  "米食文化",
-];
-
-async function classifyWithClaude(shops: ShopInput[]): Promise<Classification[]> {
+async function classifyWithClaude(shops: ShopInput[], categories: string[]): Promise<Classification[]> {
   const shopList = shops.map((s, i) => `${i + 1}. ${s.name} | ${s.address} | Google type: ${s.primaryType}`).join("\n");
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -54,7 +41,7 @@ async function classifyWithClaude(shops: ShopInput[]): Promise<Classification[]>
         content: `你是東京旅遊專門店分類助手。請為以下店家分類。
 
 可用的分類（只能選這些）：
-${CATEGORIES.map((c) => `- ${c}`).join("\n")}
+${categories.map((c) => `- ${c}`).join("\n")}
 
 店家列表：
 ${shopList}
@@ -124,7 +111,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    const classifications = await classifyWithClaude(shops);
+    // Fetch categories from DB
+    const { data: catData } = await supabase
+      .from("categories")
+      .select("name")
+      .order("sort_order");
+    const categories = (catData || []).map((c: { name: string }) => c.name);
+
+    const classifications = await classifyWithClaude(shops, categories);
 
     return new Response(JSON.stringify({ classifications }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
