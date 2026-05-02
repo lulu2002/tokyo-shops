@@ -2,6 +2,7 @@ import type { Shop } from '../types/shop';
 import { CATEGORIES } from '../constants/categories';
 import { formatDistanceLabel } from '../utils/distance';
 import { PhotoCarousel } from './PhotoCarousel';
+import { useInView } from '../hooks/useInView';
 
 interface Props {
   shop: Shop;
@@ -13,14 +14,20 @@ interface Props {
 export function ShopCard({ shop, onSelect, isOpen, distance }: Props) {
   const catColor = CATEGORIES.find((c) => c.key === shop.category)?.color || 'bg-gray-500';
   const photos = shop.photos?.length ? shop.photos : shop.photoUrl ? [shop.photoUrl] : [];
+  const { ref, inView } = useInView('300px');
 
   return (
     <div
+      ref={ref}
       onClick={() => onSelect(shop)}
       className="group text-left bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-100 cursor-pointer"
     >
       <div className="relative">
-        <PhotoCarousel photos={photos} alt={shop.name} aspect="aspect-[16/10]" mode="light" />
+        {inView ? (
+          <PhotoCarousel photos={photos} alt={shop.name} aspect="aspect-[16/10]" mode="card" />
+        ) : (
+          <div className="aspect-[16/10] bg-gray-100" />
+        )}
         <span
           className={`absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-xs font-medium text-white ${catColor}`}
         >
