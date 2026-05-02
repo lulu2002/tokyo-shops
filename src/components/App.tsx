@@ -142,29 +142,27 @@ export function App() {
         </div>
       </header>
 
-      <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-sm">
-        <TimeBar
-          checkTime={checkTime}
-          onTimeChange={handleTimeChange}
-          openCount={openCount}
-          totalCount={filtered.length}
-          showOnlyOpen={showOnlyOpen}
-          onToggleFilter={handleToggleFilter}
-          userLocation={userLocation}
-          locating={locating}
-          sortByDistance={sortByDistance}
-          onLocate={handleLocate}
-          onToggleSortDistance={() => setSortByDistance((v) => !v)}
-        />
+      <TimeBar
+        checkTime={checkTime}
+        onTimeChange={handleTimeChange}
+        openCount={openCount}
+        totalCount={filtered.length}
+        showOnlyOpen={showOnlyOpen}
+        onToggleFilter={handleToggleFilter}
+        userLocation={userLocation}
+        locating={locating}
+        sortByDistance={sortByDistance}
+        onLocate={handleLocate}
+        onToggleSortDistance={() => setSortByDistance((v) => !v)}
+      />
 
-        <CategoryTabs
-          activeCategory={activeCategory}
-          onSelect={(key) => { setActiveCategory(key); window.scrollTo({ top: 0 }); }}
-          counts={counts}
-          viewMode={viewMode}
-          onViewModeChange={persistViewMode}
-        />
-      </div>
+      <CategoryTabs
+        activeCategory={activeCategory}
+        onSelect={(key) => { setActiveCategory(key); window.scrollTo({ top: 0 }); }}
+        counts={counts}
+        viewMode={viewMode}
+        onViewModeChange={persistViewMode}
+      />
 
       <main className="max-w-7xl mx-auto">
         <ShopGrid
