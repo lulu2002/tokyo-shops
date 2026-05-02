@@ -119,8 +119,6 @@ export function App() {
 
   const handleSelectList = useCallback((listId: string) => {
     setActiveListId(listId);
-    setActiveCategory(null);
-    window.location.hash = '';
   }, []);
 
   const handleClearListFilter = useCallback(() => {
@@ -153,16 +151,20 @@ export function App() {
     return new Set(shopListMap.keys());
   }, [shopListMap]);
 
-  // Computed
+  // Computed — counts reflect active list filter
+  const baseShops = useMemo(() => {
+    return activeListId ? shops.filter((s) => listShopIds.has(s.id)) : shops;
+  }, [shops, activeListId, listShopIds]);
+
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
-    for (const s of shops) {
+    for (const s of baseShops) {
       for (const cat of s.categories) {
         map[cat] = (map[cat] || 0) + 1;
       }
     }
     return map;
-  }, [shops]);
+  }, [baseShops]);
 
   const jst = useMemo(() => toJST(checkTime), [checkTime]);
 
@@ -182,10 +184,8 @@ export function App() {
   }, [shops, userLocation]);
 
   const filtered = useMemo(() => {
-    let result = shops;
-    if (activeListId) {
-      result = result.filter((s) => listShopIds.has(s.id));
-    } else if (activeCategory) {
+    let result = baseShops;
+    if (activeCategory) {
       result = result.filter((s) => s.categories.includes(activeCategory));
     }
     if (showOnlyOpen) {
@@ -196,16 +196,14 @@ export function App() {
       result.sort((a, b) => (distanceMap.get(a.id) ?? Infinity) - (distanceMap.get(b.id) ?? Infinity));
     }
     return result;
-  }, [shops, activeCategory, activeListId, listShopIds, showOnlyOpen, openStatusMap, sortByDistance, userLocation, distanceMap]);
+  }, [baseShops, activeCategory, showOnlyOpen, openStatusMap, sortByDistance, userLocation, distanceMap]);
 
   const openCount = useMemo(() => {
-    const base = activeListId
-      ? shops.filter((s) => listShopIds.has(s.id))
-      : activeCategory
-        ? shops.filter((s) => s.categories.includes(activeCategory))
-        : shops;
-    return base.filter((s) => openStatusMap.get(s.id) === true).length;
-  }, [shops, activeCategory, activeListId, listShopIds, openStatusMap]);
+    const scope = activeCategory
+      ? baseShops.filter((s) => s.categories.includes(activeCategory))
+      : baseShops;
+    return scope.filter((s) => openStatusMap.get(s.id) === true).length;
+  }, [baseShops, activeCategory, openStatusMap]);
 
   const handleTimeChange = useCallback((d: Date) => setCheckTime(d), []);
 
