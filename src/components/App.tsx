@@ -48,21 +48,21 @@ export function App() {
   // Lists
   const [myLists, setMyLists] = useState<List[]>([]);
   const [publicLists, setPublicLists] = useState<List[]>([]);
-  const [activeListId, setActiveListId] = useState<string | null>(null);
-  const [activeList, setActiveList] = useState<List | null>(null);
-  const [listShopIds, setListShopIds] = useState<Set<number>>(new Set());
+  const [activeListIds, setActiveListIds] = useState<string[]>([]);
+  // shopId -> [{ listId, listName }] for all selected lists
+  const [selectedListShopMap, setSelectedListShopMap] = useState<Map<number, { listId: string; listName: string }[]>>(new Map());
   const [shopListMap, setShopListMap] = useState<Map<number, { listId: string; listName: string }[]>>(new Map());
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pickerShopId, setPickerShopId] = useState<number | null>(null);
 
   const parseHash = useCallback((hash: string, cats: Category[]) => {
-    if (!hash) { setActiveCategory(null); setActiveListId(null); return; }
+    if (!hash) { setActiveCategory(null); setActiveListIds([]); return; }
     if (hash.startsWith('list:')) {
-      setActiveListId(hash.slice(5));
+      setActiveListIds(hash.slice(5).split(',').filter(Boolean));
       return;
     }
     const matched = cats.find((c) => c.slug === hash);
-    if (matched) { setActiveCategory(matched.name); setActiveListId(null); }
+    if (matched) { setActiveCategory(matched.name); setActiveListIds([]); }
   }, []);
 
   // Load shops + categories + public lists
@@ -85,18 +85,28 @@ export function App() {
     fetchShopListMap(user.id).then(setShopListMap).catch(console.error);
   }, [user]);
 
-  // Load list items + list info when active list changes
+  // Load shop IDs for all selected lists
   useEffect(() => {
-    if (!activeListId) { setListShopIds(new Set()); setActiveList(null); return; }
-    fetchListShopIds(activeListId).then(setListShopIds).catch(console.error);
-    // Check if it's my list first, otherwise fetch from DB
-    const myList = myLists.find((l) => l.id === activeListId);
-    if (myList) {
-      setActiveList(myList);
-    } else {
-      fetchListById(activeListId).then(setActiveList).catch(() => setActiveList(null));
-    }
-  }, [activeListId, myLists]);
+    if (activeListIds.length === 0) { setSelectedListShopMap(new Map()); return; }
+    const allLists = [...myLists, ...publicLists];
+    Promise.all(
+      activeListIds.map(async (listId) => {
+        const ids = await fetchListShopIds(listId);
+        const list = allLists.find((l) => l.id === listId);
+        const name = list?.name || '清單';
+        return { listId, name, shopIds: ids };
+      })
+    ).then((results) => {
+      const map = new Map<number, { listId: string; listName: string }[]>();
+      for (const { listId, name, shopIds } of results) {
+        for (const shopId of shopIds) {
+          if (!map.has(shopId)) map.set(shopId, []);
+          map.get(shopId)!.push({ listId, listName: name });
+        }
+      }
+      setSelectedListShopMap(map);
+    }).catch(console.error);
+  }, [activeListIds, myLists, publicLists]);
 
   // Hash change
   useEffect(() => {
@@ -129,21 +139,29 @@ export function App() {
   const handleDeleteList = useCallback(async (listId: string) => {
     await deleteList(listId);
     setMyLists((prev) => prev.filter((l) => l.id !== listId));
-    if (activeListId === listId) { setActiveListId(null); window.location.hash = ''; }
-  }, [activeListId]);
+    setActiveListIds((prev) => {
+      const next = prev.filter((id) => id !== listId);
+      if (next.length === 0) window.location.hash = '';
+      else window.location.hash = `list:${next.join(',')}`;
+      return next;
+    });
+  }, []);
 
   const handleTogglePublic = useCallback(async (listId: string, isPublic: boolean) => {
     await updateList(listId, { is_public: isPublic });
     setMyLists((prev) => prev.map((l) => l.id === listId ? { ...l, isPublic } : l));
   }, []);
 
-  const handleSelectList = useCallback((listId: string) => {
-    setActiveListId(listId);
-    window.location.hash = `list:${listId}`;
+  const handleToggleList = useCallback((listId: string) => {
+    setActiveListIds((prev) => {
+      const next = prev.includes(listId) ? prev.filter((id) => id !== listId) : [...prev, listId];
+      window.location.hash = next.length > 0 ? `list:${next.join(',')}` : '';
+      return next;
+    });
   }, []);
 
   const handleClearListFilter = useCallback(() => {
-    setActiveListId(null);
+    setActiveListIds([]);
     window.location.hash = '';
   }, []);
 
@@ -157,8 +175,9 @@ export function App() {
     // Refresh
     fetchMyLists(user.id).then(setMyLists);
     fetchShopListMap(user.id).then(setShopListMap);
-    if (activeListId) fetchListShopIds(activeListId).then(setListShopIds);
-  }, [pickerShopId, user, activeListId]);
+    // Trigger re-fetch of selected lists
+    setActiveListIds((prev) => [...prev]);
+  }, [pickerShopId, user]);
 
   const handleHeartClick = useCallback(() => {
     if (!selectedShop) return;
@@ -174,9 +193,10 @@ export function App() {
   }, [shopListMap]);
 
   // Computed — counts reflect active list filter
+  const listFilterActive = activeListIds.length > 0;
   const baseShops = useMemo(() => {
-    return activeListId ? shops.filter((s) => listShopIds.has(s.id)) : shops;
-  }, [shops, activeListId, listShopIds]);
+    return listFilterActive ? shops.filter((s) => selectedListShopMap.has(s.id)) : shops;
+  }, [shops, listFilterActive, selectedListShopMap]);
 
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -216,9 +236,16 @@ export function App() {
     result = [...result];
     if (sortByDistance && userLocation) {
       result.sort((a, b) => (distanceMap.get(a.id) ?? Infinity) - (distanceMap.get(b.id) ?? Infinity));
+    } else if (listFilterActive && activeListIds.length > 1) {
+      // Sort by overlap: shops in more selected lists first
+      result.sort((a, b) => {
+        const aCount = selectedListShopMap.get(a.id)?.length || 0;
+        const bCount = selectedListShopMap.get(b.id)?.length || 0;
+        return bCount - aCount;
+      });
     }
     return result;
-  }, [baseShops, activeCategory, showOnlyOpen, openStatusMap, sortByDistance, userLocation, distanceMap]);
+  }, [baseShops, activeCategory, showOnlyOpen, openStatusMap, sortByDistance, userLocation, distanceMap, listFilterActive, activeListIds, selectedListShopMap]);
 
   const openCount = useMemo(() => {
     const scope = activeCategory
@@ -243,12 +270,12 @@ export function App() {
   const handleSelectCategory = useCallback((key: string | null) => {
     setActiveCategory(key);
     // Only update hash if not in list mode
-    if (!activeListId) {
+    if (!listFilterActive) {
       const slug = key ? categories.find((c) => c.name === key)?.slug || '' : '';
       window.location.hash = slug;
     }
     window.scrollTo({ top: 0 });
-  }, [categories, activeListId]);
+  }, [categories, listFilterActive]);
 
   if (loading) {
     return (
@@ -284,8 +311,13 @@ export function App() {
         onToggleSortDistance={() => setSortByDistance((v) => !v)}
       />
 
-      {activeList && (
-        <ListFilterBar listName={activeList.name} count={filtered.length} onClear={handleClearListFilter} />
+      {listFilterActive && (
+        <ListFilterBar
+          activeListIds={activeListIds}
+          allLists={[...myLists, ...publicLists]}
+          count={filtered.length}
+          onClear={handleClearListFilter}
+        />
       )}
 
       <CategoryTabs
@@ -306,6 +338,7 @@ export function App() {
           viewMode={viewMode}
           shopInListSet={user ? shopInListSet : undefined}
           onHeart={user ? handleHeartFromList : undefined}
+          shopListTags={listFilterActive ? selectedListShopMap : undefined}
         />
       </main>
 
@@ -325,8 +358,8 @@ export function App() {
         <ListDrawer
           lists={myLists}
           publicLists={publicLists.filter((pl) => !myLists.some((ml) => ml.id === pl.id))}
-          activeListId={activeListId}
-          onSelectList={handleSelectList}
+          activeListIds={activeListIds}
+          onToggleList={handleToggleList}
           onCreate={handleCreateList}
           onDelete={handleDeleteList}
           onTogglePublic={handleTogglePublic}

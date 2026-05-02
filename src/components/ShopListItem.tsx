@@ -8,9 +8,10 @@ interface Props {
   distance?: number;
   inList?: boolean;
   onHeart?: (shop: Shop) => void;
+  listTags?: { listId: string; listName: string }[];
 }
 
-export function ShopListItem({ shop, onSelect, isOpen, distance, inList, onHeart }: Props) {
+export function ShopListItem({ shop, onSelect, isOpen, distance, inList, onHeart, listTags }: Props) {
   const catColor = shop.categoryColor;
   return (
     <button
@@ -41,10 +42,15 @@ export function ShopListItem({ shop, onSelect, isOpen, distance, inList, onHeart
             <span className="text-xs text-gray-400 shrink-0">★ {shop.rating}</span>
           ) : null}
         </div>
-        <div className="flex items-center gap-1.5 mb-1">
+        <div className="flex items-center gap-1 mb-1 flex-wrap">
           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium text-white leading-none ${catColor}`}>
             {shop.subcategory}
           </span>
+          {listTags?.map((t) => (
+            <span key={t.listId} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-100 text-rose-600 leading-none">
+              {t.listName}
+            </span>
+          ))}
           {shop.specialty && (
             <span className="text-xs text-gray-400 truncate">{shop.specialty}</span>
           )}

@@ -10,9 +10,10 @@ interface Props {
   viewMode: 'grid' | 'list';
   shopInListSet?: Set<number>;
   onHeart?: (shop: Shop) => void;
+  shopListTags?: Map<number, { listId: string; listName: string }[]>;
 }
 
-export function ShopGrid({ shops, onSelect, openStatusMap, distanceMap, viewMode, shopInListSet, onHeart }: Props) {
+export function ShopGrid({ shops, onSelect, openStatusMap, distanceMap, viewMode, shopInListSet, onHeart, shopListTags }: Props) {
   if (shops.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-400">
@@ -33,6 +34,7 @@ export function ShopGrid({ shops, onSelect, openStatusMap, distanceMap, viewMode
             distance={distanceMap.get(shop.id)}
             inList={shopInListSet?.has(shop.id)}
             onHeart={onHeart}
+            listTags={shopListTags?.get(shop.id)}
           />
         ))}
       </div>
@@ -50,6 +52,7 @@ export function ShopGrid({ shops, onSelect, openStatusMap, distanceMap, viewMode
           distance={distanceMap.get(shop.id)}
           inList={shopInListSet?.has(shop.id)}
           onHeart={onHeart}
+          listTags={shopListTags?.get(shop.id)}
         />
       ))}
     </div>

@@ -10,9 +10,10 @@ interface Props {
   distance?: number;
   inList?: boolean;
   onHeart?: (shop: Shop) => void;
+  listTags?: { listId: string; listName: string }[];
 }
 
-export function ShopCard({ shop, onSelect, isOpen, distance, inList, onHeart }: Props) {
+export function ShopCard({ shop, onSelect, isOpen, distance, inList, onHeart, listTags }: Props) {
   const catColor = shop.categoryColor;
   const photos = shop.photos?.length ? shop.photos : shop.photoUrl ? [shop.photoUrl] : [];
   const { ref, inView } = useInView('300px');
@@ -56,6 +57,15 @@ export function ShopCard({ shop, onSelect, isOpen, distance, inList, onHeart }: 
         </h3>
         {shop.specialty && (
           <p className="text-sm text-gray-500 mt-1 line-clamp-1">{shop.specialty}</p>
+        )}
+        {listTags && listTags.length > 0 && (
+          <div className="flex gap-1 mt-1.5 flex-wrap">
+            {listTags.map((t) => (
+              <span key={t.listId} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-100 text-rose-600">
+                {t.listName}
+              </span>
+            ))}
+          </div>
         )}
         <div className="flex items-center justify-between mt-2">
           <div className="flex items-center gap-2 text-xs text-gray-400">
