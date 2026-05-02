@@ -70,7 +70,7 @@ export function ShopCard({ shop, onSelect, isOpen, distance, inList, onHeart }: 
             {onHeart && (
               <button
                 onClick={(e) => { e.stopPropagation(); onHeart(shop); }}
-                className="text-sm"
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-rose-50 text-sm transition-colors"
               >
                 {inList ? '❤️' : '🤍'}
               </button>
