@@ -24,7 +24,7 @@ export function ShopCard({ shop, onSelect, isOpen, distance }: Props) {
     >
       <div className="relative">
         {inView ? (
-          <PhotoCarousel photos={photos} alt={shop.name} aspect="aspect-[16/10]" mode="card" />
+          <PhotoCarousel photos={photos} alt={shop.name} aspect="aspect-[16/10]" />
         ) : (
           <div className="aspect-[16/10] bg-gray-100" />
         )}
