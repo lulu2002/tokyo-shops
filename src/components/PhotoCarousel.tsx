@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface Props {
   photos: string[];
@@ -9,6 +9,49 @@ interface Props {
 export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]' }: Props) {
   const [idx, setIdx] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const startIdx = useRef(0);
+  const touching = useRef(false);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const onTouchStart = () => {
+      touching.current = true;
+      startIdx.current = Math.round(el.scrollLeft / el.clientWidth);
+    };
+
+    const onTouchEnd = () => {
+      touching.current = false;
+    };
+
+    const onScroll = () => {
+      const w = el.clientWidth;
+      if (!w) return;
+
+      if (touching.current) {
+        // Clamp scroll to ±1 photo from where the touch started
+        const minScroll = Math.max(0, (startIdx.current - 1) * w);
+        const maxScroll = Math.min((photos.length - 1) * w, (startIdx.current + 1) * w);
+        if (el.scrollLeft < minScroll) el.scrollLeft = minScroll;
+        else if (el.scrollLeft > maxScroll) el.scrollLeft = maxScroll;
+      }
+
+      setIdx(Math.round(el.scrollLeft / w));
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    el.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    el.addEventListener('scroll', onScroll, { passive: false });
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchend', onTouchEnd);
+      el.removeEventListener('touchcancel', onTouchEnd);
+      el.removeEventListener('scroll', onScroll);
+    };
+  }, [photos.length]);
 
   if (photos.length === 0) {
     return (
@@ -26,14 +69,9 @@ export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]' }: Props)
     );
   }
 
-  const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setIdx(Math.round(el.scrollLeft / el.clientWidth));
-  };
-
   const scrollTo = (i: number, e?: React.MouseEvent) => {
     e?.stopPropagation();
+    startIdx.current = i; // update so clamp doesn't fight the programmatic scroll
     scrollRef.current?.scrollTo({ left: i * (scrollRef.current?.clientWidth || 0), behavior: 'smooth' });
   };
 
@@ -44,11 +82,14 @@ export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]' }: Props)
     <div className="relative group">
       <div
         ref={scrollRef}
-        onScroll={handleScroll}
         className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
       >
         {photos.map((url, i) => (
-          <div key={i} className={`snap-center shrink-0 w-full ${aspect} bg-gray-100`} style={{ scrollSnapStop: 'always' }}>
+          <div
+            key={i}
+            className={`snap-center shrink-0 w-full ${aspect} bg-gray-100`}
+            style={{ scrollSnapStop: 'always' }}
+          >
             {Math.abs(i - idx) <= 1 || i === 0 ? (
               <img
                 src={url}
