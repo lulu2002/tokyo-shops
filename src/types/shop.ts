@@ -3,6 +3,7 @@ export interface Shop {
   name: string;
   category: string;
   categories: string[];
+  categoryColor: string;
   subcategory: string;
   specialty: string;
   description: string;

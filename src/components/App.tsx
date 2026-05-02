@@ -6,16 +6,8 @@ import { ShopDetail } from './ShopDetail';
 import { TimeBar } from './TimeBar';
 import { isOpenAt, toJST } from '../utils/openStatus';
 import { haversine } from '../utils/distance';
-import { getCategoryById, getCategoryByKey } from '../constants/categories';
-import shopsData from '../data/shops.json';
-
-const base = import.meta.env.BASE_URL;
-const resolveImg = (p: string) => p ? `${base}${p.replace(/^\//, '')}` : '';
-const shops = (shopsData as Shop[]).map((s) => ({
-  ...s,
-  photoUrl: resolveImg(s.photoUrl),
-  photos: s.photos?.map(resolveImg).filter(Boolean) || [],
-}));
+import { fetchShops, fetchCategories } from '../lib/api';
+import type { Category } from '../lib/api';
 
 interface UserLocation {
   lat: number;
@@ -23,19 +15,11 @@ interface UserLocation {
 }
 
 export function App() {
-  const [activeCategory, setActiveCategory] = useState<string | null>(() => {
-    const hash = window.location.hash.replace('#', '');
-    return getCategoryById(hash)?.key || null;
-  });
+  const [shops, setShops] = useState<Shop[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const onHashChange = () => {
-      const hash = window.location.hash.replace('#', '');
-      setActiveCategory(getCategoryById(hash)?.key || null);
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [checkTime, setCheckTime] = useState(() => new Date());
   const [showOnlyOpen, setShowOnlyOpen] = useState(() => {
@@ -47,6 +31,34 @@ export function App() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
     try { const v = localStorage.getItem('pref:viewMode'); return v === 'list' ? 'list' : 'grid'; } catch { return 'grid'; }
   });
+
+  // Load data from Supabase
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL;
+    Promise.all([fetchShops(base), fetchCategories()])
+      .then(([s, c]) => {
+        setShops(s);
+        setCategories(c);
+        // Resolve hash after categories are loaded
+        const hash = window.location.hash.replace('#', '');
+        const matched = c.find((cat) => cat.slug === hash);
+        if (matched) setActiveCategory(matched.name);
+      })
+      .catch((err) => console.error('Failed to load data:', err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Handle hash changes
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (!hash) { setActiveCategory(null); return; }
+      const matched = categories.find((c) => c.slug === hash);
+      setActiveCategory(matched?.name || null);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [categories]);
 
   const persistViewMode = useCallback((mode: 'grid' | 'list') => {
     setViewMode(mode);
@@ -68,7 +80,7 @@ export function App() {
       }
     }
     return map;
-  }, []);
+  }, [shops]);
 
   const jst = useMemo(() => toJST(checkTime), [checkTime]);
 
@@ -78,7 +90,7 @@ export function App() {
       map.set(s.id, isOpenAt(s.hours, jst));
     }
     return map;
-  }, [jst]);
+  }, [shops, jst]);
 
   const distanceMap = useMemo(() => {
     const map = new Map<number, number>();
@@ -89,7 +101,7 @@ export function App() {
       }
     }
     return map;
-  }, [userLocation]);
+  }, [shops, userLocation]);
 
   const filtered = useMemo(() => {
     let result = shops;
@@ -99,9 +111,7 @@ export function App() {
     if (showOnlyOpen) {
       result = result.filter((s) => openStatusMap.get(s.id) === true);
     }
-
     result = [...result];
-
     if (sortByDistance && userLocation) {
       result.sort((a, b) => {
         const da = distanceMap.get(a.id) ?? Infinity;
@@ -110,21 +120,20 @@ export function App() {
       });
     }
     return result;
-  }, [activeCategory, showOnlyOpen, openStatusMap, sortByDistance, userLocation, distanceMap]);
+  }, [shops, activeCategory, showOnlyOpen, openStatusMap, sortByDistance, userLocation, distanceMap]);
 
   const openCount = useMemo(() => {
     const currentFiltered = activeCategory
       ? shops.filter((s) => s.categories.includes(activeCategory))
       : shops;
     return currentFiltered.filter((s) => openStatusMap.get(s.id) === true).length;
-  }, [activeCategory, openStatusMap]);
+  }, [shops, activeCategory, openStatusMap]);
 
   const handleTimeChange = useCallback((d: Date) => setCheckTime(d), []);
   const handleToggleFilter = persistShowOnlyOpen;
 
   const handleLocate = useCallback(() => {
     if (userLocation) {
-      // Toggle off
       setUserLocation(null);
       setSortByDistance(false);
       return;
@@ -141,6 +150,21 @@ export function App() {
       { enableHighAccuracy: true, timeout: 10000 },
     );
   }, [userLocation]);
+
+  const handleSelectCategory = useCallback((key: string | null) => {
+    const slug = key ? categories.find((c) => c.name === key)?.slug || '' : '';
+    window.location.hash = slug;
+    setActiveCategory(key);
+    window.scrollTo({ top: 0 });
+  }, [categories]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-400">載入中...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -171,10 +195,11 @@ export function App() {
 
       <CategoryTabs
         activeCategory={activeCategory}
-        onSelect={(key) => { window.location.hash = key ? (getCategoryByKey(key)?.id || '') : ''; setActiveCategory(key); window.scrollTo({ top: 0 }); }}
+        onSelect={handleSelectCategory}
         counts={counts}
         viewMode={viewMode}
         onViewModeChange={persistViewMode}
+        categories={categories}
       />
 
       <main className="max-w-7xl mx-auto">

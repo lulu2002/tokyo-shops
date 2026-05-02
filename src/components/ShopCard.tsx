@@ -1,5 +1,4 @@
 import type { Shop } from '../types/shop';
-import { CATEGORIES } from '../constants/categories';
 import { formatDistanceLabel } from '../utils/distance';
 import { PhotoCarousel } from './PhotoCarousel';
 import { useInView } from '../hooks/useInView';
@@ -12,7 +11,7 @@ interface Props {
 }
 
 export function ShopCard({ shop, onSelect, isOpen, distance }: Props) {
-  const catColor = CATEGORIES.find((c) => c.key === shop.category)?.color || 'bg-gray-500';
+  const catColor = shop.categoryColor;
   const photos = shop.photos?.length ? shop.photos : shop.photoUrl ? [shop.photoUrl] : [];
   const { ref, inView } = useInView('300px');
 

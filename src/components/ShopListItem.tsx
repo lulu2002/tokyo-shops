@@ -1,5 +1,4 @@
 import type { Shop } from '../types/shop';
-import { CATEGORIES } from '../constants/categories';
 import { formatDistance, estimateWalkMinutes } from '../utils/distance';
 
 interface Props {
@@ -10,7 +9,7 @@ interface Props {
 }
 
 export function ShopListItem({ shop, onSelect, isOpen, distance }: Props) {
-  const catColor = CATEGORIES.find((c) => c.key === shop.category)?.color || 'bg-gray-500';
+  const catColor = shop.categoryColor;
   return (
     <button
       onClick={() => onSelect(shop)}

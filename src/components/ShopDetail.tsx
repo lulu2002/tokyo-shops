@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import type { Shop } from '../types/shop';
-import { CATEGORIES } from '../constants/categories';
 import { formatDistanceLabel } from '../utils/distance';
 import { PhotoCarousel } from './PhotoCarousel';
 
@@ -12,7 +11,7 @@ interface Props {
 }
 
 export function ShopDetail({ shop, onClose, isOpen, distance }: Props) {
-  const catColor = CATEGORIES.find((c) => c.key === shop.category)?.color || 'bg-gray-500';
+  const catColor = shop.categoryColor;
   const mapsUrl = shop.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${shop.lat},${shop.lng}`;
   const summaryText = shop.description || '';
   const photos = shop.photos?.length ? shop.photos : shop.photoUrl ? [shop.photoUrl] : [];
