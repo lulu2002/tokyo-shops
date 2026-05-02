@@ -133,6 +133,26 @@ export async function deleteList(listId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function fetchPublicLists(): Promise<List[]> {
+  const { data, error } = await supabase
+    .from('lists')
+    .select('*, list_items(count)')
+    .eq('is_public', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data || []).map((l: Record<string, unknown>) => ({
+    id: l.id as string,
+    userId: l.user_id as string,
+    name: l.name as string,
+    color: l.color as string,
+    isPublic: true,
+    sortOrder: l.sort_order as number,
+    createdAt: l.created_at as string,
+    itemCount: ((l.list_items as { count: number }[])?.[0]?.count) || 0,
+  }));
+}
+
 export async function fetchListById(listId: string): Promise<List | null> {
   const { data, error } = await supabase
     .from('lists')

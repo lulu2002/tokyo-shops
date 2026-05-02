@@ -5,17 +5,29 @@ interface Props {
   onSignIn: () => void;
   onSignOut: () => void;
   onOpenLists: () => void;
+  hasPublicLists: boolean;
 }
 
-export function UserMenu({ user, onSignIn, onSignOut, onOpenLists }: Props) {
+export function UserMenu({ user, onSignIn, onSignOut, onOpenLists, hasPublicLists }: Props) {
   if (!user) {
     return (
-      <button
-        onClick={onSignIn}
-        className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition-colors"
-      >
-        登入
-      </button>
+      <div className="flex items-center gap-2">
+        {hasPublicLists && (
+          <button
+            onClick={onOpenLists}
+            className="px-2 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-lg"
+            title="清單"
+          >
+            📋
+          </button>
+        )}
+        <button
+          onClick={onSignIn}
+          className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition-colors"
+        >
+          登入
+        </button>
+      </div>
     );
   }
 
@@ -27,7 +39,7 @@ export function UserMenu({ user, onSignIn, onSignOut, onOpenLists }: Props) {
       <button
         onClick={onOpenLists}
         className="px-2 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-lg"
-        title="我的清單"
+        title="清單"
       >
         📋
       </button>

@@ -12,7 +12,7 @@ import { ListPicker } from './ListPicker';
 import { isOpenAt, toJST } from '../utils/openStatus';
 import { haversine } from '../utils/distance';
 import {
-  fetchShops, fetchCategories, fetchMyLists, createList, updateList, deleteList,
+  fetchShops, fetchCategories, fetchMyLists, fetchPublicLists, createList, updateList, deleteList,
   fetchListShopIds, addToList, removeFromList, fetchShopListMap, fetchListById,
 } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
@@ -47,6 +47,7 @@ export function App() {
 
   // Lists
   const [myLists, setMyLists] = useState<List[]>([]);
+  const [publicLists, setPublicLists] = useState<List[]>([]);
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [activeList, setActiveList] = useState<List | null>(null);
   const [listShopIds, setListShopIds] = useState<Set<number>>(new Set());
@@ -64,12 +65,13 @@ export function App() {
     if (matched) { setActiveCategory(matched.name); setActiveListId(null); }
   }, []);
 
-  // Load shops + categories
+  // Load shops + categories + public lists
   useEffect(() => {
-    Promise.all([fetchShops(), fetchCategories()])
-      .then(([s, c]) => {
+    Promise.all([fetchShops(), fetchCategories(), fetchPublicLists()])
+      .then(([s, c, pl]) => {
         setShops(s);
         setCategories(c);
+        setPublicLists(pl);
         parseHash(window.location.hash.replace('#', ''), c);
       })
       .catch((err) => console.error('Failed to load:', err))
@@ -264,7 +266,7 @@ export function App() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">東京專門店地圖</h1>
             <p className="text-sm text-gray-500 mt-1">98 個領域 · {shops.length} 間店</p>
           </div>
-          <UserMenu user={user} onSignIn={signInWithGoogle} onSignOut={signOut} onOpenLists={() => setDrawerOpen(true)} />
+          <UserMenu user={user} onSignIn={signInWithGoogle} onSignOut={signOut} onOpenLists={() => setDrawerOpen(true)} hasPublicLists={publicLists.length > 0} />
         </div>
       </header>
 
@@ -322,6 +324,7 @@ export function App() {
       {drawerOpen && (
         <ListDrawer
           lists={myLists}
+          publicLists={publicLists.filter((pl) => !myLists.some((ml) => ml.id === pl.id))}
           activeListId={activeListId}
           onSelectList={handleSelectList}
           onCreate={handleCreateList}
