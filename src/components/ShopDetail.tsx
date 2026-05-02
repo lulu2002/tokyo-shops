@@ -8,9 +8,12 @@ interface Props {
   onClose: () => void;
   isOpen: boolean | null;
   distance?: number;
+  isLoggedIn: boolean;
+  inListIds: string[];
+  onHeartClick: () => void;
 }
 
-export function ShopDetail({ shop, onClose, isOpen, distance }: Props) {
+export function ShopDetail({ shop, onClose, isOpen, distance, isLoggedIn, inListIds, onHeartClick }: Props) {
   const catColor = shop.categoryColor;
   const mapsUrl = shop.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${shop.lat},${shop.lng}`;
   const summaryText = shop.description || '';
@@ -135,6 +138,18 @@ export function ShopDetail({ shop, onClose, isOpen, distance }: Props) {
               >
                 官方網站 →
               </a>
+            )}
+            {isLoggedIn && (
+              <button
+                onClick={onHeartClick}
+                className={`w-12 shrink-0 py-3 rounded-lg text-lg transition-colors ${
+                  inListIds.length > 0
+                    ? 'bg-rose-500 text-white'
+                    : 'bg-gray-100 text-gray-400 hover:bg-rose-50 hover:text-rose-500'
+                }`}
+              >
+                {inListIds.length > 0 ? '❤️' : '🤍'}
+              </button>
             )}
           </div>
         </div>

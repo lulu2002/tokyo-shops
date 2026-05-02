@@ -4,9 +4,10 @@ interface Props {
   user: User | null;
   onSignIn: () => void;
   onSignOut: () => void;
+  onOpenLists: () => void;
 }
 
-export function UserMenu({ user, onSignIn, onSignOut }: Props) {
+export function UserMenu({ user, onSignIn, onSignOut, onOpenLists }: Props) {
   if (!user) {
     return (
       <button
@@ -23,6 +24,13 @@ export function UserMenu({ user, onSignIn, onSignOut }: Props) {
 
   return (
     <div className="flex items-center gap-2">
+      <button
+        onClick={onOpenLists}
+        className="px-2 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors text-lg"
+        title="我的清單"
+      >
+        📋
+      </button>
       <span className="text-sm text-gray-600 hidden sm:inline">{name}</span>
       {avatar ? (
         <img src={avatar} alt="" className="w-8 h-8 rounded-full" />

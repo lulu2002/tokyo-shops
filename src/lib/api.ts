@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { Shop } from '../types/shop';
+import type { List } from '../types/list';
 
 interface DbShop {
   id: number;
@@ -77,6 +78,102 @@ export async function fetchShops(): Promise<Shop[]> {
   if (error) throw error;
   return (data as DbShop[]).map(mapShop);
 }
+
+// ============================================
+// Lists
+// ============================================
+
+export async function fetchMyLists(userId: string): Promise<List[]> {
+  const { data, error } = await supabase
+    .from('lists')
+    .select('*, list_items(count)')
+    .eq('user_id', userId)
+    .order('sort_order');
+
+  if (error) throw error;
+  return (data || []).map((l: Record<string, unknown>) => ({
+    id: l.id as string,
+    userId: l.user_id as string,
+    name: l.name as string,
+    color: l.color as string,
+    isPublic: l.is_public as boolean,
+    sortOrder: l.sort_order as number,
+    createdAt: l.created_at as string,
+    itemCount: ((l.list_items as { count: number }[])?.[0]?.count) || 0,
+  }));
+}
+
+export async function createList(userId: string, name: string, color = 'bg-rose-500'): Promise<List> {
+  const { data, error } = await supabase
+    .from('lists')
+    .insert({ user_id: userId, name, color })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return {
+    id: data.id,
+    userId: data.user_id,
+    name: data.name,
+    color: data.color,
+    isPublic: data.is_public,
+    sortOrder: data.sort_order,
+    createdAt: data.created_at,
+    itemCount: 0,
+  };
+}
+
+export async function deleteList(listId: string): Promise<void> {
+  const { error } = await supabase.from('lists').delete().eq('id', listId);
+  if (error) throw error;
+}
+
+export async function fetchListShopIds(listId: string): Promise<Set<number>> {
+  const { data, error } = await supabase
+    .from('list_items')
+    .select('shop_id')
+    .eq('list_id', listId);
+
+  if (error) throw error;
+  return new Set((data || []).map((r: { shop_id: number }) => r.shop_id));
+}
+
+export async function addToList(listId: string, shopId: number): Promise<void> {
+  const { error } = await supabase
+    .from('list_items')
+    .insert({ list_id: listId, shop_id: shopId });
+  if (error) throw error;
+}
+
+export async function removeFromList(listId: string, shopId: number): Promise<void> {
+  const { error } = await supabase
+    .from('list_items')
+    .delete()
+    .eq('list_id', listId)
+    .eq('shop_id', shopId);
+  if (error) throw error;
+}
+
+export async function fetchShopListMap(userId: string): Promise<Map<number, { listId: string; listName: string }[]>> {
+  const { data, error } = await supabase
+    .from('list_items')
+    .select('shop_id, list_id, lists(name)')
+    .eq('lists.user_id', userId);
+
+  if (error) throw error;
+  const map = new Map<number, { listId: string; listName: string }[]>();
+  for (const row of data || []) {
+    const shopId = row.shop_id as number;
+    const entry = { listId: row.list_id as string, listName: (row.lists as { name: string })?.name || '' };
+    if (!map.has(shopId)) map.set(shopId, []);
+    map.get(shopId)!.push(entry);
+  }
+  return map;
+}
+
+// ============================================
+// Categories
+// ============================================
 
 export async function fetchCategories(): Promise<Category[]> {
   const { data, error } = await supabase
