@@ -8,7 +8,11 @@ import { isOpenAt, toJST } from '../utils/openStatus';
 import { haversine } from '../utils/distance';
 import shopsData from '../data/shops.json';
 
-const shops = shopsData as Shop[];
+const base = import.meta.env.BASE_URL;
+const shops = (shopsData as Shop[]).map((s) => ({
+  ...s,
+  photoUrl: s.photoUrl ? `${base}${s.photoUrl.replace(/^\//, '')}` : '',
+}));
 
 interface UserLocation {
   lat: number;
