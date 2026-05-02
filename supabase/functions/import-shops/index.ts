@@ -214,16 +214,30 @@ Deno.serve(async (req) => {
 
     const results: PlaceResult[] = [];
 
-    for (const url of urls) {
+    for (let url of urls) {
+      // Resolve short URLs (maps.app.goo.gl)
+      if (url.includes("goo.gl") || url.includes("maps.app")) {
+        try {
+          const redirectRes = await fetch(url, { redirect: "follow" });
+          url = redirectRes.url;
+        } catch { /* keep original */ }
+      }
+
       // Parse URL to get search query
       let query = url;
       // Try to extract place name from URL
       const placeMatch = url.match(/\/place\/([^/@]+)/);
       if (placeMatch) {
         query = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
+      } else {
+        // Try CID-based URL - search by coordinates if available
+        const coordMatch = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+        if (coordMatch) {
+          query = `${coordMatch[1]},${coordMatch[2]}`;
+        }
       }
 
-      const place = await searchPlace(query + " 東京");
+      const place = await searchPlace(query);
       if (place) {
         const checked = await checkDuplicate(place, existingShops || []);
         results.push(checked);
