@@ -40,6 +40,7 @@ function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
 }) {
   const [dragOffset, setDragOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const touchRef = useRef<{ startX: number; startY: number; decided: boolean; isHorizontal: boolean } | null>(null);
 
   const prevIdx = idx > 0 ? idx - 1 : photos.length - 1;
@@ -77,8 +78,9 @@ function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
 
     if (!t.isHorizontal) return;
 
-    // Clamp drag to roughly 1 card width, resist at edges
-    const maxDrag = 200;
+    // Clamp drag to 80% of container width (less than 1 full card)
+    const w = containerRef.current?.clientWidth || 300;
+    const maxDrag = w * 0.8;
     let offset = Math.max(-maxDrag, Math.min(maxDrag, dx));
     if ((idx === 0 && offset > 0) || (idx === photos.length - 1 && offset < 0)) {
       offset = offset * 0.3;
@@ -102,11 +104,14 @@ function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
     touchRef.current = null;
   };
 
-  const translateX = -(idx * 100) + (dragOffset / 3.5);
+  const w = containerRef.current?.clientWidth || 1;
+  const dragPercent = (dragOffset / w) * 100;
+  const translateX = -(idx * 100) + dragPercent;
 
   return (
     <div className="relative group">
       <div
+        ref={containerRef}
         className={`${aspect} overflow-hidden`}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
