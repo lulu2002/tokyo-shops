@@ -41,6 +41,7 @@ function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
   const [dragOffset, setDragOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lockRef = useRef(false);
   const touchRef = useRef<{ startX: number; startY: number; decided: boolean; isHorizontal: boolean } | null>(null);
 
   const prevIdx = idx > 0 ? idx - 1 : photos.length - 1;
@@ -49,9 +50,12 @@ function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
   const goTo = useCallback((i: number) => {
     setIdx(i);
     setDragOffset(0);
+    lockRef.current = true;
+    setTimeout(() => { lockRef.current = false; }, 320);
   }, [setIdx]);
 
   const onTouchStart = (e: React.TouchEvent) => {
+    if (lockRef.current) return;
     touchRef.current = {
       startX: e.touches[0].clientX,
       startY: e.touches[0].clientY,
@@ -64,7 +68,7 @@ function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
 
   const onTouchMove = (e: React.TouchEvent) => {
     const t = touchRef.current;
-    if (!t) return;
+    if (!t || lockRef.current) return;
     const dx = e.touches[0].clientX - t.startX;
     const dy = e.touches[0].clientY - t.startY;
 
@@ -78,12 +82,12 @@ function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
 
     if (!t.isHorizontal) return;
 
-    // Clamp drag to 80% of container width (less than 1 full card)
+    // Clamp drag to 60% of container width
     const w = containerRef.current?.clientWidth || 300;
-    const maxDrag = w * 0.8;
+    const maxDrag = w * 0.6;
     let offset = Math.max(-maxDrag, Math.min(maxDrag, dx));
     if ((idx === 0 && offset > 0) || (idx === photos.length - 1 && offset < 0)) {
-      offset = offset * 0.3;
+      offset = offset * 0.2;
     }
     setDragOffset(offset);
   };
@@ -92,7 +96,8 @@ function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
     const t = touchRef.current;
     if (!t) return;
 
-    if (t.isHorizontal && Math.abs(dragOffset) > 40) {
+    const w = containerRef.current?.clientWidth || 300;
+    if (t.isHorizontal && Math.abs(dragOffset) > w * 0.15) {
       if (dragOffset < 0 && idx < photos.length - 1) goTo(idx + 1);
       else if (dragOffset > 0 && idx > 0) goTo(idx - 1);
       else setDragOffset(0);
