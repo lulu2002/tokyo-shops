@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Shop } from '../types/shop';
 import { CategoryTabs } from './CategoryTabs';
 import { ShopGrid } from './ShopGrid';
@@ -22,7 +22,19 @@ interface UserLocation {
 }
 
 export function App() {
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(() => {
+    const hash = decodeURIComponent(window.location.hash.replace('#', ''));
+    return hash || null;
+  });
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = decodeURIComponent(window.location.hash.replace('#', ''));
+      setActiveCategory(hash || null);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [checkTime, setCheckTime] = useState(() => new Date());
   const [showOnlyOpen, setShowOnlyOpen] = useState(() => {
@@ -158,7 +170,7 @@ export function App() {
 
       <CategoryTabs
         activeCategory={activeCategory}
-        onSelect={(key) => { setActiveCategory(key); window.scrollTo({ top: 0 }); }}
+        onSelect={(key) => { window.location.hash = key || ''; setActiveCategory(key); window.scrollTo({ top: 0 }); }}
         counts={counts}
         viewMode={viewMode}
         onViewModeChange={persistViewMode}
