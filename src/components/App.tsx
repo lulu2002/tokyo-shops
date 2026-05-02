@@ -53,19 +53,27 @@ export function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pickerShopId, setPickerShopId] = useState<number | null>(null);
 
+  const parseHash = useCallback((hash: string, cats: Category[]) => {
+    if (!hash) { setActiveCategory(null); setActiveListId(null); return; }
+    if (hash.startsWith('list:')) {
+      setActiveListId(hash.slice(5));
+      return;
+    }
+    const matched = cats.find((c) => c.slug === hash);
+    if (matched) { setActiveCategory(matched.name); setActiveListId(null); }
+  }, []);
+
   // Load shops + categories
   useEffect(() => {
     Promise.all([fetchShops(), fetchCategories()])
       .then(([s, c]) => {
         setShops(s);
         setCategories(c);
-        const hash = window.location.hash.replace('#', '');
-        const matched = c.find((cat) => cat.slug === hash);
-        if (matched) setActiveCategory(matched.name);
+        parseHash(window.location.hash.replace('#', ''), c);
       })
       .catch((err) => console.error('Failed to load:', err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [parseHash]);
 
   // Load user lists when logged in
   useEffect(() => {
@@ -83,14 +91,11 @@ export function App() {
   // Hash change
   useEffect(() => {
     const onHashChange = () => {
-      const hash = window.location.hash.replace('#', '');
-      if (!hash) { setActiveCategory(null); return; }
-      const matched = categories.find((c) => c.slug === hash);
-      setActiveCategory(matched?.name || null);
+      parseHash(window.location.hash.replace('#', ''), categories);
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, [categories]);
+  }, [categories, parseHash]);
 
   const persistViewMode = useCallback((mode: 'grid' | 'list') => {
     setViewMode(mode);
@@ -119,10 +124,12 @@ export function App() {
 
   const handleSelectList = useCallback((listId: string) => {
     setActiveListId(listId);
+    window.location.hash = `list:${listId}`;
   }, []);
 
   const handleClearListFilter = useCallback(() => {
     setActiveListId(null);
+    window.location.hash = '';
   }, []);
 
   const handleToggleListItem = useCallback(async (listId: string, add: boolean) => {
@@ -219,12 +226,14 @@ export function App() {
   }, [userLocation]);
 
   const handleSelectCategory = useCallback((key: string | null) => {
-    const slug = key ? categories.find((c) => c.name === key)?.slug || '' : '';
-    window.location.hash = slug;
     setActiveCategory(key);
-    setActiveListId(null);
+    // Only update hash if not in list mode
+    if (!activeListId) {
+      const slug = key ? categories.find((c) => c.name === key)?.slug || '' : '';
+      window.location.hash = slug;
+    }
     window.scrollTo({ top: 0 });
-  }, [categories]);
+  }, [categories, activeListId]);
 
   const activeList = myLists.find((l) => l.id === activeListId);
 
