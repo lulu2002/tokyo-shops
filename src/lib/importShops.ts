@@ -50,6 +50,49 @@ export async function resolveUrls(
   return data.shops as ImportPreview[];
 }
 
+export async function classifyShops(
+  shops: ImportPreview[],
+): Promise<ImportPreview[]> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not logged in');
+
+  const input = shops.map((s) => ({
+    name: s.name,
+    address: s.address,
+    primaryType: s.primaryType,
+  }));
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/classify-shops`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ shops: input }),
+  });
+
+  if (!res.ok) return shops;
+
+  const data = await res.json();
+  const classifications = data.classifications || [];
+
+  return shops.map((shop) => {
+    const cls = classifications.find(
+      (c: { name: string }) => c.name === shop.name,
+    );
+    if (cls) {
+      return {
+        ...shop,
+        category: cls.category,
+        subcategory: cls.subcategory,
+        specialty: cls.specialty,
+        description: cls.description,
+      };
+    }
+    return shop;
+  });
+}
+
 export async function saveImportedShops(
   shops: ImportPreview[],
   categoryMap: Map<string, number>,

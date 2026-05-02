@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
 import type { ImportPreview } from '../lib/importShops';
-import { resolveUrls, saveImportedShops } from '../lib/importShops';
+import { resolveUrls, classifyShops, saveImportedShops } from '../lib/importShops';
 import type { Category } from '../lib/api';
 
-type Step = 'input' | 'loading' | 'filter' | 'review' | 'saving';
+type Step = 'input' | 'loading' | 'filter' | 'classifying' | 'review' | 'saving';
 
 interface Props {
   categories: Category[];
@@ -37,6 +37,20 @@ export function ImportModal({ categories, categoryMap, onClose, onDone }: Props)
 
   // Step 2: Filter - swipe cards
   const currentPreview = previews[filterIdx];
+
+  const runClassify = useCallback(async () => {
+    setStep('classifying');
+    const selectedShops = previews.filter((_, i) => selected.has(i));
+    const classified = await classifyShops(selectedShops);
+    // Map back to previews
+    setPreviews((prev) => prev.map((p, i) => {
+      if (!selected.has(i)) return p;
+      const cls = classified.find((c) => c.name === p.name);
+      return cls || p;
+    }));
+    setStep('review');
+  }, [previews, selected]);
+
   const handleSwipe = (accept: boolean) => {
     if (accept) {
       setSelected((prev) => new Set(prev).add(filterIdx));
@@ -46,11 +60,11 @@ export function ImportModal({ categories, categoryMap, onClose, onDone }: Props)
     if (filterIdx < previews.length - 1) {
       setFilterIdx(filterIdx + 1);
     } else {
-      setStep('review');
+      runClassify();
     }
   };
 
-  const handleSkipToReview = () => setStep('review');
+  const handleSkipToReview = () => runClassify();
 
   // Step 3: Review - edit categories
   const updatePreview = (idx: number, updates: Partial<ImportPreview>) => {
@@ -80,6 +94,7 @@ export function ImportModal({ categories, categoryMap, onClose, onDone }: Props)
             {step === 'input' && '匯入店家'}
             {step === 'loading' && '解析中...'}
             {step === 'filter' && `篩選 (${filterIdx + 1}/${previews.length})`}
+            {step === 'classifying' && 'AI 分類中...'}
             {step === 'review' && `確認匯入 (${selectedPreviews.length} 間)`}
             {step === 'saving' && '匯入中...'}
           </h3>
@@ -112,6 +127,15 @@ export function ImportModal({ categories, categoryMap, onClose, onDone }: Props)
           <div className="p-8 text-center">
             <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
             <p className="text-gray-500">解析中 {progress.done}/{progress.total}</p>
+          </div>
+        )}
+
+        {/* Step: Classifying */}
+        {step === 'classifying' && (
+          <div className="p-8 text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-gray-500">AI 分類中...</p>
+            <p className="text-xs text-gray-400 mt-1">正在為 {selectedPreviews.length} 間店家建議分類</p>
           </div>
         )}
 
