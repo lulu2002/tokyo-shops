@@ -9,23 +9,6 @@ interface Props {
 
 export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]', mode = 'full' }: Props) {
   const [idx, setIdx] = useState(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const scrollTo = useCallback((i: number) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
-    setIdx(i);
-  }, []);
-
-  const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setIdx(Math.round(el.scrollLeft / el.clientWidth));
-  };
-
-  const prevIdx = idx > 0 ? idx - 1 : photos.length - 1;
-  const nextIdx = idx < photos.length - 1 ? idx + 1 : 0;
 
   if (photos.length === 0) {
     return (
@@ -43,6 +26,156 @@ export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]', mode = '
     );
   }
 
+  if (mode === 'card') {
+    return <CardCarousel photos={photos} alt={alt} aspect={aspect} idx={idx} setIdx={setIdx} />;
+  }
+
+  return <FullCarousel photos={photos} alt={alt} aspect={aspect} idx={idx} setIdx={setIdx} />;
+}
+
+// Card mode: transform-based with smooth animation + touch drag
+function CardCarousel({ photos, alt, aspect, idx, setIdx }: {
+  photos: string[]; alt: string; aspect: string;
+  idx: number; setIdx: (i: number) => void;
+}) {
+  const [dragOffset, setDragOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const touchRef = useRef<{ startX: number; startY: number; decided: boolean; isHorizontal: boolean } | null>(null);
+
+  const prevIdx = idx > 0 ? idx - 1 : photos.length - 1;
+  const nextIdx = idx < photos.length - 1 ? idx + 1 : 0;
+
+  const goTo = useCallback((i: number) => {
+    setIdx(i);
+    setDragOffset(0);
+  }, [setIdx]);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchRef.current = {
+      startX: e.touches[0].clientX,
+      startY: e.touches[0].clientY,
+      decided: false,
+      isHorizontal: false,
+    };
+    setDragging(true);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    const t = touchRef.current;
+    if (!t) return;
+    const dx = e.touches[0].clientX - t.startX;
+    const dy = e.touches[0].clientY - t.startY;
+
+    if (!t.decided) {
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+        t.decided = true;
+        t.isHorizontal = Math.abs(dx) > Math.abs(dy);
+      }
+      return;
+    }
+
+    if (!t.isHorizontal) return;
+
+    // Resist at edges
+    let offset = dx;
+    if ((idx === 0 && dx > 0) || (idx === photos.length - 1 && dx < 0)) {
+      offset = dx * 0.3;
+    }
+    setDragOffset(offset);
+  };
+
+  const onTouchEnd = () => {
+    const t = touchRef.current;
+    if (!t) return;
+
+    if (t.isHorizontal && Math.abs(dragOffset) > 50) {
+      if (dragOffset < 0 && idx < photos.length - 1) goTo(idx + 1);
+      else if (dragOffset > 0 && idx > 0) goTo(idx - 1);
+      else setDragOffset(0);
+    } else {
+      setDragOffset(0);
+    }
+
+    setDragging(false);
+    touchRef.current = null;
+  };
+
+  const translateX = -(idx * 100) + (dragOffset / 3.5);
+
+  return (
+    <div className="relative group">
+      <div
+        className={`${aspect} overflow-hidden`}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        <div
+          className="flex h-full"
+          style={{
+            transform: `translateX(${translateX}%)`,
+            transition: dragging ? 'none' : 'transform 300ms cubic-bezier(0.25, 1, 0.5, 1)',
+            width: `${photos.length * 100}%`,
+          }}
+        >
+          {photos.map((url, i) => (
+            <div key={i} className="h-full bg-gray-100" style={{ width: `${100 / photos.length}%` }}>
+              {i === idx || i === prevIdx || i === nextIdx ? (
+                <img
+                  src={url}
+                  alt={`${alt} ${i + 1}`}
+                  className="w-full h-full object-cover"
+                  loading={i === idx ? 'eager' : 'lazy'}
+                  draggable={false}
+                />
+              ) : (
+                <div className="w-full h-full" />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop arrows */}
+      <button
+        onClick={(e) => { e.stopPropagation(); goTo(prevIdx); }}
+        className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
+      >
+        ‹
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); goTo(nextIdx); }}
+        className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
+      >
+        ›
+      </button>
+
+      <Dots count={photos.length} current={idx} />
+    </div>
+  );
+}
+
+// Full mode: scroll container with snap (for detail modal)
+function FullCarousel({ photos, alt, aspect, idx, setIdx }: {
+  photos: string[]; alt: string; aspect: string;
+  idx: number; setIdx: (i: number) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setIdx(Math.round(el.scrollLeft / el.clientWidth));
+  };
+
+  const scrollTo = (i: number) => {
+    scrollRef.current?.scrollTo({ left: i * (scrollRef.current?.clientWidth || 0), behavior: 'smooth' });
+    setIdx(i);
+  };
+
+  const prevIdx = idx > 0 ? idx - 1 : photos.length - 1;
+  const nextIdx = idx < photos.length - 1 ? idx + 1 : 0;
+
   return (
     <div className="relative group">
       <div
@@ -52,22 +185,16 @@ export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]', mode = '
       >
         {photos.map((url, i) => (
           <div key={i} className={`snap-center shrink-0 w-full ${aspect} bg-gray-100`}>
-            {/* Only load current + neighbors, placeholder for the rest */}
-            {i === idx || i === prevIdx || i === nextIdx ? (
-              <img
-                src={url}
-                alt={`${alt} ${i + 1}`}
-                className="w-full h-full object-cover"
-                loading={i === idx ? 'eager' : 'lazy'}
-              />
-            ) : (
-              <div className="w-full h-full" />
-            )}
+            <img
+              src={url}
+              alt={`${alt} ${i + 1}`}
+              className="w-full h-full object-cover"
+              loading={i === 0 ? 'eager' : 'lazy'}
+            />
           </div>
         ))}
       </div>
 
-      {/* Desktop arrows */}
       <button
         onClick={(e) => { e.stopPropagation(); scrollTo(prevIdx); }}
         className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
@@ -81,17 +208,22 @@ export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]', mode = '
         ›
       </button>
 
-      {/* Dots */}
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-        {photos.map((_, i) => (
-          <span
-            key={i}
-            className={`w-1.5 h-1.5 rounded-full transition-colors ${
-              i === idx ? 'bg-white' : 'bg-white/40'
-            }`}
-          />
-        ))}
-      </div>
+      <Dots count={photos.length} current={idx} />
+    </div>
+  );
+}
+
+function Dots({ count, current }: { count: number; current: number }) {
+  return (
+    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+      {Array.from({ length: count }, (_, i) => (
+        <span
+          key={i}
+          className={`w-1.5 h-1.5 rounded-full transition-colors ${
+            i === current ? 'bg-white' : 'bg-white/40'
+          }`}
+        />
+      ))}
     </div>
   );
 }
