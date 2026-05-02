@@ -5,7 +5,4 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   base: '/tokyo-shops/',
   plugins: [react(), tailwindcss()],
-  build: {
-    target: 'es2020',
-  },
 })
