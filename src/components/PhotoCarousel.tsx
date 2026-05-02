@@ -4,27 +4,22 @@ interface Props {
   photos: string[];
   alt: string;
   aspect?: string;
+  mode?: 'full' | 'light';
 }
 
-export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]' }: Props) {
+export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]', mode = 'full' }: Props) {
   const [idx, setIdx] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const scrollTo = useCallback((i: number) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
-    setIdx(i);
-  }, []);
+  const prev = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setIdx((i) => (i > 0 ? i - 1 : photos.length - 1));
+  }, [photos.length]);
 
-  const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setIdx(Math.round(el.scrollLeft / el.clientWidth));
-  };
-
-  const prev = () => scrollTo(idx > 0 ? idx - 1 : photos.length - 1);
-  const next = () => scrollTo(idx < photos.length - 1 ? idx + 1 : 0);
+  const next = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setIdx((i) => (i < photos.length - 1 ? i + 1 : 0));
+  }, [photos.length]);
 
   if (photos.length === 0) {
     return (
@@ -37,10 +32,40 @@ export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]' }: Props)
   if (photos.length === 1) {
     return (
       <div className={`${aspect} bg-gray-100 overflow-hidden`}>
-        <img src={photos[0]} alt={alt} className="w-full h-full object-cover" />
+        <img src={photos[0]} alt={alt} loading="lazy" className="w-full h-full object-cover" />
       </div>
     );
   }
+
+  // Light mode: single <img>, swap src on arrow click (for cards - minimal DOM)
+  if (mode === 'light') {
+    return (
+      <div className="relative group">
+        <div className={`${aspect} bg-gray-100 overflow-hidden`}>
+          <img
+            src={photos[idx]}
+            alt={`${alt} ${idx + 1}`}
+            loading="lazy"
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <Arrows onPrev={prev} onNext={next} />
+        <Dots count={photos.length} current={idx} />
+      </div>
+    );
+  }
+
+  // Full mode: scroll container with snap (for detail modal - smooth swipe)
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setIdx(Math.round(el.scrollLeft / el.clientWidth));
+  };
+
+  const scrollTo = (i: number) => {
+    scrollRef.current?.scrollTo({ left: i * (scrollRef.current?.clientWidth || 0), behavior: 'smooth' });
+    setIdx(i);
+  };
 
   return (
     <div className="relative group">
@@ -60,33 +85,45 @@ export function PhotoCarousel({ photos, alt, aspect = 'aspect-[16/10]' }: Props)
           </div>
         ))}
       </div>
+      <Arrows
+        onPrev={(e) => { e?.stopPropagation(); scrollTo(idx > 0 ? idx - 1 : photos.length - 1); }}
+        onNext={(e) => { e?.stopPropagation(); scrollTo(idx < photos.length - 1 ? idx + 1 : 0); }}
+      />
+      <Dots count={photos.length} current={idx} />
+    </div>
+  );
+}
 
-      {/* Arrow buttons - desktop only */}
+function Arrows({ onPrev, onNext }: { onPrev: (e?: React.MouseEvent) => void; onNext: (e?: React.MouseEvent) => void }) {
+  return (
+    <>
       <button
-        onClick={(e) => { e.stopPropagation(); prev(); }}
+        onClick={onPrev}
         className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
       >
         ‹
       </button>
       <button
-        onClick={(e) => { e.stopPropagation(); next(); }}
+        onClick={onNext}
         className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
       >
         ›
       </button>
+    </>
+  );
+}
 
-      {/* Dots */}
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-        {photos.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => scrollTo(i)}
-            className={`w-1.5 h-1.5 rounded-full transition-colors ${
-              i === idx ? 'bg-white' : 'bg-white/40'
-            }`}
-          />
-        ))}
-      </div>
+function Dots({ count, current }: { count: number; current: number }) {
+  return (
+    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+      {Array.from({ length: count }, (_, i) => (
+        <span
+          key={i}
+          className={`w-1.5 h-1.5 rounded-full transition-colors ${
+            i === current ? 'bg-white' : 'bg-white/40'
+          }`}
+        />
+      ))}
     </div>
   );
 }

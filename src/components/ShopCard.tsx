@@ -20,7 +20,7 @@ export function ShopCard({ shop, onSelect, isOpen, distance }: Props) {
       className="group text-left bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-100 cursor-pointer"
     >
       <div className="relative">
-        <PhotoCarousel photos={photos} alt={shop.name} aspect="aspect-[16/10]" />
+        <PhotoCarousel photos={photos} alt={shop.name} aspect="aspect-[16/10]" mode="light" />
         <span
           className={`absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-xs font-medium text-white ${catColor}`}
         >
