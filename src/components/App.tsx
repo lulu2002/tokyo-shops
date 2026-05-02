@@ -6,6 +6,7 @@ import { ShopDetail } from './ShopDetail';
 import { TimeBar } from './TimeBar';
 import { isOpenAt, toJST } from '../utils/openStatus';
 import { haversine } from '../utils/distance';
+import { getCategoryById, getCategoryByKey } from '../constants/categories';
 import shopsData from '../data/shops.json';
 
 const base = import.meta.env.BASE_URL;
@@ -23,14 +24,14 @@ interface UserLocation {
 
 export function App() {
   const [activeCategory, setActiveCategory] = useState<string | null>(() => {
-    const hash = decodeURIComponent(window.location.hash.replace('#', ''));
-    return hash || null;
+    const hash = window.location.hash.replace('#', '');
+    return getCategoryById(hash)?.key || null;
   });
 
   useEffect(() => {
     const onHashChange = () => {
-      const hash = decodeURIComponent(window.location.hash.replace('#', ''));
-      setActiveCategory(hash || null);
+      const hash = window.location.hash.replace('#', '');
+      setActiveCategory(getCategoryById(hash)?.key || null);
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -170,7 +171,7 @@ export function App() {
 
       <CategoryTabs
         activeCategory={activeCategory}
-        onSelect={(key) => { window.location.hash = key || ''; setActiveCategory(key); window.scrollTo({ top: 0 }); }}
+        onSelect={(key) => { window.location.hash = key ? (getCategoryByKey(key)?.id || '') : ''; setActiveCategory(key); window.scrollTo({ top: 0 }); }}
         counts={counts}
         viewMode={viewMode}
         onViewModeChange={persistViewMode}
