@@ -8,9 +8,11 @@ interface Props {
   openStatusMap: Map<number, boolean | null>;
   distanceMap: Map<number, number>;
   viewMode: 'grid' | 'list';
+  shopInListSet?: Set<number>;
+  onHeart?: (shop: Shop) => void;
 }
 
-export function ShopGrid({ shops, onSelect, openStatusMap, distanceMap, viewMode }: Props) {
+export function ShopGrid({ shops, onSelect, openStatusMap, distanceMap, viewMode, shopInListSet, onHeart }: Props) {
   if (shops.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-400">
@@ -29,6 +31,8 @@ export function ShopGrid({ shops, onSelect, openStatusMap, distanceMap, viewMode
             onSelect={onSelect}
             isOpen={openStatusMap.get(shop.id) ?? null}
             distance={distanceMap.get(shop.id)}
+            inList={shopInListSet?.has(shop.id)}
+            onHeart={onHeart}
           />
         ))}
       </div>
@@ -44,6 +48,8 @@ export function ShopGrid({ shops, onSelect, openStatusMap, distanceMap, viewMode
           onSelect={onSelect}
           isOpen={openStatusMap.get(shop.id) ?? null}
           distance={distanceMap.get(shop.id)}
+          inList={shopInListSet?.has(shop.id)}
+          onHeart={onHeart}
         />
       ))}
     </div>

@@ -145,6 +145,14 @@ export function App() {
     setPickerShopId(selectedShop.id);
   }, [selectedShop]);
 
+  const handleHeartFromList = useCallback((shop: Shop) => {
+    setPickerShopId(shop.id);
+  }, []);
+
+  const shopInListSet = useMemo(() => {
+    return new Set(shopListMap.keys());
+  }, [shopListMap]);
+
   // Computed
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -276,6 +284,8 @@ export function App() {
           openStatusMap={openStatusMap}
           distanceMap={distanceMap}
           viewMode={viewMode}
+          shopInListSet={user ? shopInListSet : undefined}
+          onHeart={user ? handleHeartFromList : undefined}
         />
       </main>
 

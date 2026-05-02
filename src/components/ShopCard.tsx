@@ -8,9 +8,11 @@ interface Props {
   onSelect: (shop: Shop) => void;
   isOpen: boolean | null;
   distance?: number;
+  inList?: boolean;
+  onHeart?: (shop: Shop) => void;
 }
 
-export function ShopCard({ shop, onSelect, isOpen, distance }: Props) {
+export function ShopCard({ shop, onSelect, isOpen, distance, inList, onHeart }: Props) {
   const catColor = shop.categoryColor;
   const photos = shop.photos?.length ? shop.photos : shop.photoUrl ? [shop.photoUrl] : [];
   const { ref, inView } = useInView('300px');
@@ -59,11 +61,21 @@ export function ShopCard({ shop, onSelect, isOpen, distance }: Props) {
           <div className="flex items-center gap-2 text-xs text-gray-400">
             <span>📍 {shop.location}</span>
           </div>
-          {distance !== undefined && (
-            <span className="text-xs font-medium text-blue-600 shrink-0">
-              {formatDistanceLabel(distance)}
-            </span>
-          )}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {distance !== undefined && (
+              <span className="text-xs font-medium text-blue-600">
+                {formatDistanceLabel(distance)}
+              </span>
+            )}
+            {onHeart && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onHeart(shop); }}
+                className="text-sm"
+              >
+                {inList ? '❤️' : '🤍'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

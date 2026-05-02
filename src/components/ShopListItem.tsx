@@ -6,9 +6,11 @@ interface Props {
   onSelect: (shop: Shop) => void;
   isOpen: boolean | null;
   distance?: number;
+  inList?: boolean;
+  onHeart?: (shop: Shop) => void;
 }
 
-export function ShopListItem({ shop, onSelect, isOpen, distance }: Props) {
+export function ShopListItem({ shop, onSelect, isOpen, distance, inList, onHeart }: Props) {
   const catColor = shop.categoryColor;
   return (
     <button
@@ -63,6 +65,14 @@ export function ShopListItem({ shop, onSelect, isOpen, distance }: Props) {
             )}
             {isOpen === false && (
               <span className="text-[10px] text-gray-400">休</span>
+            )}
+            {onHeart && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onHeart(shop); }}
+                className="text-sm"
+              >
+                {inList ? '❤️' : '🤍'}
+              </button>
             )}
           </div>
         </div>
