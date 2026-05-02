@@ -1,73 +1,32 @@
-# React + TypeScript + Vite
+# Tokyo Specialty Shops Map
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+152 間東京專門店的互動式地圖網站，涵蓋 98 個領域、10 大分類。
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **分類篩選** — 3C、文具、廚房道具、食品茶酒、時尚配件、手工藝、生活雜貨、運動戶外、書店藝文、米食文化
+- **卡片 / 清單切換** — 卡片模式慢慢逛，清單模式快速掃
+- **營業狀態** — 即時顯示東京時間的營業狀態，支援自訂時間查詢
+- **附近店家** — 瀏覽器定位後依距離排序，顯示步行時間
+- **店家詳情** — Google Places 照片、評分、營業時間、地址
+- **Google Maps 連結** — 直接開啟店家的 Google Maps 頁面
+- **RWD** — 手機、平板、桌面完整支援
+- **偏好記憶** — 檢視模式、篩選狀態存在 localStorage
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Vite + React + TypeScript
+- Tailwind CSS
+- Google Places API (New) — 照片、評分、營業時間
+- GitHub Pages + GitHub Actions 自動部署
 
-## Expanding the ESLint configuration
+## Development
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Data Source
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+店家資料來源為手動整理的東京專門店清單，經緯度與店家資訊透過 Google Places API 查詢取得。
