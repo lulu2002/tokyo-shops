@@ -64,8 +64,10 @@ export function useTripRealtime(tripId: string | null, enabled: boolean): UseTri
   useEffect(() => {
     if (!tripId || !enabled) return;
 
+    // Unique channel name per mount to avoid Strict Mode race condition
+    const channelName = `trip-items:${tripId}:${Date.now()}`;
     const channel = supabase
-      .channel(`trip-items:${tripId}`)
+      .channel(channelName)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',

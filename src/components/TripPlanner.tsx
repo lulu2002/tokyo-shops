@@ -946,7 +946,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
     <div className={inline
       ? 'flex flex-col bg-white'
       : 'fixed inset-0 bottom-0 z-40 bg-white flex flex-col'
-    } style={inline ? { height: 'calc(100dvh - 56px - 56px)' } : undefined}>
+    } style={inline ? { height: 'calc(100dvh - 56px)' } : undefined}>
       {/* Header bar */}
       <div className="shrink-0 bg-white border-b border-gray-200">
         {editMode ? (
