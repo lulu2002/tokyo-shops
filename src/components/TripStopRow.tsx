@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { TripStop, StopTimeline } from '../types/trip';
+import { estimateWalkMinutes } from '../utils/distance';
 
 const DURATION_OPTIONS = [0, 15, 30, 45, 60, 90, 120];
 
@@ -8,13 +9,14 @@ interface Props {
   onRemove?: () => void;
   onToggleVisited?: () => void;
   onDurationChange?: (duration: number) => void;
+  onSelect?: () => void;
   aiNote?: string;
   duration?: number;
   stopTimeline?: StopTimeline;
   distance?: number;
 }
 
-export function TripStopRow({ stop, onRemove, onToggleVisited, onDurationChange, aiNote, duration, stopTimeline, distance }: Props) {
+export function TripStopRow({ stop, onRemove, onToggleVisited, onDurationChange, onSelect, aiNote, duration, stopTimeline, distance }: Props) {
   const { shop, openWindow, closed, visited } = stop;
   const dimmed = closed || visited;
   const [durationOpen, setDurationOpen] = useState(false);
@@ -29,27 +31,36 @@ export function TripStopRow({ stop, onRemove, onToggleVisited, onDurationChange,
         {/* Estimated arrival */}
         {stopTimeline && !dimmed && (
           <span className={`shrink-0 text-xs font-mono w-10 ${isClosed ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
-            ~{stopTimeline.arrivalStr}
+            {stopTimeline.arrivalStr}
           </span>
         )}
 
-        {/* Photo */}
-        <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-gray-100">
-          {shop.photoUrl && (
-            <img src={shop.photoUrl} className="w-full h-full object-cover" />
-          )}
-        </div>
-
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className={`text-sm font-medium truncate ${closed ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-            {shop.name}
+        {/* Photo + Info (clickable) */}
+        <button
+          onClick={onSelect}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left hover:opacity-75 transition-opacity"
+          disabled={!onSelect}
+        >
+          <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+            {shop.photoUrl && (
+              <img src={shop.photoUrl} className="w-full h-full object-cover" />
+            )}
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            {shop.subcategory && <span>{shop.subcategory}</span>}
-            {distance !== undefined && <span>· {Math.round(distance)}m</span>}
+          <div className="flex-1 min-w-0">
+            <div className={`text-sm font-medium truncate ${closed ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+              {shop.name}
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              {shop.subcategory && <span>{shop.subcategory}</span>}
+              {!onRemove && currentDuration > 0 && (
+                <span className="text-gray-400">· 停留 {currentDuration} 分</span>
+              )}
+              {distance !== undefined && distance < 5000 && (
+                <span className="text-blue-500">· 步行 {estimateWalkMinutes(distance)} 分</span>
+              )}
+            </div>
           </div>
-        </div>
+        </button>
 
         {/* Duration picker */}
         {onDurationChange && !dimmed && (

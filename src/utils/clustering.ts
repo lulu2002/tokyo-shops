@@ -74,5 +74,6 @@ export function clusterStops(stops: TripStop[]): Cluster[] {
  */
 export function interClusterWalkMinutes(a: Cluster, b: Cluster): number {
   const meters = haversine(a.centroid.lat, a.centroid.lng, b.centroid.lat, b.centroid.lng);
-  return estimateWalkMinutes(meters);
+  const mins = estimateWalkMinutes(meters);
+  return Math.ceil(mins / 5) * 5; // round up to nearest 5
 }

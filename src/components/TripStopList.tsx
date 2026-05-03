@@ -31,9 +31,11 @@ interface Props {
   onReorderClusters?: (fromIdx: number, toIdx: number) => void;
   onReorderShopInCluster?: (clusterIdx: number, fromIdx: number, toIdx: number) => void;
   onDurationChange?: (shopId: number, duration: number) => void;
+  onSelectShop?: (shopId: number) => void;
   aiNotes?: Map<number, string>;
   shopDurations?: Map<number, number>;
   timeline?: TimelineData | null;
+  stopDistances?: Map<number, number>;
   totalStops: number;
   hasTimeWindow: boolean;
   feasibility?: { needed: number; available: number; ratio: number };
@@ -58,14 +60,16 @@ function SortableCluster({ id, children }: { id: string; children: React.ReactNo
 }
 
 // Sortable wrapper for a shop row
-function SortableShopRow({ stop, onRemove, onToggleVisited, onDurationChange, aiNote, duration, stopTimeline, draggable }: {
+function SortableShopRow({ stop, onRemove, onToggleVisited, onDurationChange, onSelect, aiNote, duration, stopTimeline, distance, draggable }: {
   stop: TripStop;
   onRemove?: () => void;
   onToggleVisited?: () => void;
   onDurationChange?: (duration: number) => void;
+  onSelect?: () => void;
   aiNote?: string;
   duration?: number;
   stopTimeline?: StopTimeline;
+  distance?: number;
   draggable?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -93,9 +97,11 @@ function SortableShopRow({ stop, onRemove, onToggleVisited, onDurationChange, ai
             onRemove={onRemove}
             onToggleVisited={onToggleVisited}
             onDurationChange={onDurationChange}
+            onSelect={onSelect}
             aiNote={aiNote}
             duration={duration}
             stopTimeline={stopTimeline}
+            distance={distance}
           />
         </div>
       </div>
@@ -103,7 +109,7 @@ function SortableShopRow({ stop, onRemove, onToggleVisited, onDurationChange, ai
   );
 }
 
-export function TripStopList({ clusters, closedStops, onRemove, onToggleVisited, onReorderClusters, onReorderShopInCluster, onDurationChange, aiNotes, shopDurations, timeline, totalStops, hasTimeWindow, feasibility }: Props) {
+export function TripStopList({ clusters, closedStops, onRemove, onToggleVisited, onReorderClusters, onReorderShopInCluster, onDurationChange, onSelectShop, aiNotes, shopDurations, timeline, stopDistances, totalStops, hasTimeWindow, feasibility }: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
@@ -172,7 +178,7 @@ export function TripStopList({ clusters, closedStops, onRemove, onToggleVisited,
                   <span className="text-gray-300">({cluster.stops.length} 間)</span>
                   {timeline?.clusterTimelines.get(cluster.id) && (
                     <span className="ml-auto text-gray-400">
-                      ~{timeline.clusterTimelines.get(cluster.id)!.arrivalStr}-{timeline.clusterTimelines.get(cluster.id)!.departureStr}
+                      {timeline.clusterTimelines.get(cluster.id)!.arrivalStr}-{timeline.clusterTimelines.get(cluster.id)!.departureStr}
                     </span>
                   )}
                 </div>
@@ -188,9 +194,11 @@ export function TripStopList({ clusters, closedStops, onRemove, onToggleVisited,
                       onRemove={onRemove ? () => onRemove(stop.shop.id) : undefined}
                       onToggleVisited={onToggleVisited ? () => onToggleVisited(stop.shop.id) : undefined}
                       onDurationChange={onDurationChange ? (d: number) => onDurationChange(stop.shop.id, d) : undefined}
+                      onSelect={onSelectShop ? () => onSelectShop(stop.shop.id) : undefined}
                       aiNote={aiNotes?.get(stop.shop.id)}
                       duration={shopDurations?.get(stop.shop.id)}
                       stopTimeline={timeline?.stopTimelines.get(stop.shop.id)}
+                      distance={stopDistances?.get(stop.shop.id)}
                       draggable={!!onReorderShopInCluster}
                     />
                   ))}
@@ -201,7 +209,7 @@ export function TripStopList({ clusters, closedStops, onRemove, onToggleVisited,
               {i < clusters.length - 1 && (
                 <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-gray-400">
                   <div className="flex-1 border-t border-dashed border-gray-200" />
-                  <span>🚶 步行 ~{interClusterWalkMinutes(cluster, clusters[i + 1])} 分</span>
+                  <span>🚶 步行 {interClusterWalkMinutes(cluster, clusters[i + 1])} 分</span>
                   <div className="flex-1 border-t border-dashed border-gray-200" />
                 </div>
               )}

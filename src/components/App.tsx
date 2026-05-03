@@ -12,7 +12,7 @@ import { ImportModal } from './ImportModal';
 import { ListPicker } from './ListPicker';
 import { MapView } from './MapView';
 import { TripPlanner } from './TripPlanner';
-import { listTrips, deleteTrip, type SavedTrip } from '../lib/tripStorage';
+import { listTripsAsync, deleteTripAsync, migrateLocalTrips, type SavedTrip } from '../lib/tripStorage';
 import { BottomNav } from './BottomNav';
 import { TripListView } from './TripListView';
 import { isOpenAt, toJST } from '../utils/openStatus';
@@ -37,6 +37,7 @@ export function App() {
   const [tripLoadData, setTripLoadData] = useState<SavedTrip | undefined>();
   const [tripListOpen, setTripListOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<'explore' | 'map' | 'trip' | 'lists'>('explore');
+  const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
 
   // Data
   const [shops, setShops] = useState<Shop[]>([]);
@@ -90,12 +91,20 @@ export function App() {
       .finally(() => setLoading(false));
   }, [parseHash]);
 
-  // Load user lists when logged in
+  // Load trips
+  const refreshTrips = useCallback(() => {
+    listTripsAsync().then(setSavedTrips).catch(console.error);
+  }, []);
+
+  useEffect(() => { refreshTrips(); }, [refreshTrips]);
+
+  // Load user lists when logged in + migrate local trips
   useEffect(() => {
     if (!user) { setMyLists([]); setShopListMap(new Map()); return; }
     fetchMyLists(user.id).then(setMyLists).catch(console.error);
     fetchShopListMap(user.id).then(setShopListMap).catch(console.error);
-  }, [user]);
+    migrateLocalTrips().then((n) => { if (n > 0) refreshTrips(); }).catch(console.error);
+  }, [user, refreshTrips]);
 
   // Load shop IDs for all selected lists
   useEffect(() => {
@@ -346,9 +355,9 @@ export function App() {
                   >
                     + 新行程
                   </button>
-                  {listTrips().length > 0 && (
+                  {savedTrips.length > 0 && (
                     <div className="max-h-48 overflow-y-auto">
-                      {listTrips().map(trip => (
+                      {savedTrips.map(trip => (
                         <div key={trip.id} className="flex items-center hover:bg-gray-50">
                           <button
                             onClick={() => { setTripLoadData(trip); setTripOpen(true); setTripSource('desktop'); setTripListOpen(false); }}
@@ -358,7 +367,7 @@ export function App() {
                             <div className="text-xs text-gray-400">{trip.shopIds.length} 間店</div>
                           </button>
                           <button
-                            onClick={() => { deleteTrip(trip.id); setTripListOpen(v => !v); setTimeout(() => setTripListOpen(v => !v), 0); }}
+                            onClick={() => { deleteTripAsync(trip.id).then(refreshTrips); setTripListOpen(false); }}
                             className="px-3 py-2 text-gray-300 hover:text-red-400 text-xs"
                           >
                             ✕
@@ -466,7 +475,8 @@ export function App() {
           key={`mobile-${tripLoadData?.id ?? 'new'}`}
           shops={shops}
           categories={categories}
-          onClose={() => { setTripOpen(false); setTripLoadData(undefined); }}
+          lists={myLists}
+          onClose={() => { setTripOpen(false); setTripLoadData(undefined); refreshTrips(); }}
           loadTrip={tripLoadData}
           inline
         />
@@ -476,7 +486,7 @@ export function App() {
       <BottomNav
         active={mobileTab}
         onChange={handleMobileTab}
-        tripCount={listTrips().length}
+        tripCount={savedTrips.length}
         listCount={myLists.length}
       />
 
@@ -523,7 +533,8 @@ export function App() {
           key={`desktop-${tripLoadData?.id ?? 'new'}`}
           shops={shops}
           categories={categories}
-          onClose={() => { setTripOpen(false); setTripLoadData(undefined); }}
+          lists={myLists}
+          onClose={() => { setTripOpen(false); setTripLoadData(undefined); refreshTrips(); }}
           loadTrip={tripLoadData}
         />
       )}

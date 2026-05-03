@@ -1,4 +1,5 @@
-import { listTrips, deleteTrip, type SavedTrip } from '../lib/tripStorage';
+import { useEffect, useState } from 'react';
+import { listTripsAsync, deleteTripAsync, type SavedTrip } from '../lib/tripStorage';
 
 interface Props {
   onSelectTrip: (trip: SavedTrip) => void;
@@ -6,7 +7,18 @@ interface Props {
 }
 
 export function TripListView({ onSelectTrip, onNewTrip }: Props) {
-  const trips = listTrips();
+  const [trips, setTrips] = useState<SavedTrip[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    listTripsAsync().then(setTrips).catch(console.error).finally(() => setLoading(false));
+  }, []);
+
+  const handleDelete = async (trip: SavedTrip) => {
+    if (!confirm(`刪除「${trip.name}」？`)) return;
+    await deleteTripAsync(trip.id);
+    setTrips(prev => prev.filter(t => t.id !== trip.id));
+  };
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6">
@@ -20,7 +32,9 @@ export function TripListView({ onSelectTrip, onNewTrip }: Props) {
         </button>
       </div>
 
-      {trips.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-16 text-gray-400 text-sm">載入中...</div>
+      ) : trips.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <div className="text-4xl mb-3">📋</div>
           <p className="text-sm">還沒有行程</p>
@@ -31,8 +45,9 @@ export function TripListView({ onSelectTrip, onNewTrip }: Props) {
           {trips.map(trip => {
             const visitedCount = trip.visitedIds?.length || 0;
             const totalCount = trip.shopIds.length;
-            const isToday = trip.tripDate === new Date().toISOString().slice(0, 10);
-            const isPast = trip.tripDate < new Date().toISOString().slice(0, 10);
+            const today = new Date().toISOString().slice(0, 10);
+            const isToday = trip.tripDate === today;
+            const isPast = trip.tripDate < today;
 
             return (
               <div
@@ -45,16 +60,14 @@ export function TripListView({ onSelectTrip, onNewTrip }: Props) {
                   onClick={() => onSelectTrip(trip)}
                   className="w-full px-4 py-3 text-left"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base font-medium text-gray-900">{trip.name}</span>
-                      {isToday && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">今天</span>
-                      )}
-                      {isPast && !isToday && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">已過</span>
-                      )}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-medium text-gray-900">{trip.name}</span>
+                    {isToday && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">今天</span>
+                    )}
+                    {isPast && !isToday && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">已過</span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
@@ -68,7 +81,6 @@ export function TripListView({ onSelectTrip, onNewTrip }: Props) {
                     )}
                   </div>
 
-                  {/* Progress bar */}
                   {visitedCount > 0 && (
                     <div className="mt-2 h-1 bg-gray-100 rounded-full overflow-hidden">
                       <div
@@ -81,16 +93,7 @@ export function TripListView({ onSelectTrip, onNewTrip }: Props) {
 
                 <div className="border-t border-gray-100 px-4 py-1.5 flex justify-end">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`刪除「${trip.name}」？`)) {
-                        deleteTrip(trip.id);
-                        // Force re-render by triggering parent
-                        onNewTrip(); // hack: will cause parent to re-render
-                        // Actually we need a better way... just reload
-                        window.location.reload();
-                      }
-                    }}
+                    onClick={() => handleDelete(trip)}
                     className="text-xs text-gray-300 hover:text-red-400 transition-colors"
                   >
                     刪除
