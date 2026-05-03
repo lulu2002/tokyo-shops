@@ -12,6 +12,8 @@ export interface SavedTrip {
   visitedIds: number[];
   shopDurations: Record<string, number>;
   createdAt: string;
+  isCollaborative?: boolean;
+  userId?: string;
 }
 
 function tripToSaved(t: Trip): SavedTrip {
@@ -25,6 +27,8 @@ function tripToSaved(t: Trip): SavedTrip {
     visitedIds: t.visitedIds,
     shopDurations: t.shopDurations,
     createdAt: t.createdAt,
+    isCollaborative: t.isCollaborative,
+    userId: t.userId,
   };
 }
 

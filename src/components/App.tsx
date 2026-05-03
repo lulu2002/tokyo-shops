@@ -13,6 +13,8 @@ import { ListPicker } from './ListPicker';
 import { MapView } from './MapView';
 import { TripPlanner } from './TripPlanner';
 import { listTripsAsync, deleteTripAsync, migrateLocalTrips, type SavedTrip } from '../lib/tripStorage';
+import { upsertUserProfile, fetchTripById } from '../lib/tripCollabApi';
+import { TripInviteJoin } from './TripInviteJoin';
 import { BottomNav } from './BottomNav';
 import { TripListView } from './TripListView';
 import { isOpenAt, toJST } from '../utils/openStatus';
@@ -38,6 +40,7 @@ export function App() {
   const [tripListOpen, setTripListOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<'explore' | 'map' | 'trip' | 'lists'>('explore');
   const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
+  const [pendingInviteId, setPendingInviteId] = useState<string | null>(null);
 
   // Data
   const [shops, setShops] = useState<Shop[]>([]);
@@ -70,6 +73,10 @@ export function App() {
 
   const parseHash = useCallback((hash: string, cats: Category[]) => {
     if (!hash) { setActiveCategory(null); setActiveListIds([]); return; }
+    if (hash.startsWith('trip-invite:')) {
+      setPendingInviteId(hash.slice(12));
+      return;
+    }
     if (hash.startsWith('list:')) {
       setActiveListIds(hash.slice(5).split(',').filter(Boolean));
       return;
@@ -98,12 +105,19 @@ export function App() {
 
   useEffect(() => { refreshTrips(); }, [refreshTrips]);
 
-  // Load user lists when logged in + migrate local trips
+  // Load user lists when logged in + migrate local trips + upsert profile
   useEffect(() => {
     if (!user) { setMyLists([]); setShopListMap(new Map()); return; }
     fetchMyLists(user.id).then(setMyLists).catch(console.error);
     fetchShopListMap(user.id).then(setShopListMap).catch(console.error);
     migrateLocalTrips().then((n) => { if (n > 0) refreshTrips(); }).catch(console.error);
+    // Upsert user profile for collaborative features
+    const meta = user.user_metadata;
+    upsertUserProfile(
+      user.id,
+      meta?.full_name || meta?.name || '',
+      meta?.avatar_url || meta?.picture || '',
+    ).catch(console.error);
   }, [user, refreshTrips]);
 
   // Load shop IDs for all selected lists
@@ -280,6 +294,33 @@ export function App() {
     // Reload shops
     fetchShops().then(setShops);
   }, []);
+
+  // Handle joining a trip via invite link
+  const handleInviteJoined = useCallback(async (tripId: string) => {
+    try {
+      const trip = await fetchTripById(tripId);
+      const savedTrip: SavedTrip = {
+        id: trip.id,
+        name: trip.name || '',
+        tripDate: trip.trip_date || '',
+        startTime: trip.start_time || '',
+        endTime: trip.end_time || '',
+        shopIds: trip.shop_ids || [],
+        visitedIds: trip.visited_ids || [],
+        shopDurations: trip.shop_durations || {},
+        createdAt: trip.created_at || '',
+        isCollaborative: trip.is_collaborative ?? true,
+        userId: trip.user_id,
+      };
+      setTripLoadData(savedTrip);
+      setTripOpen(true);
+      setTripSource('desktop');
+      refreshTrips();
+    } catch {
+      console.error('Failed to load joined trip');
+    }
+    setPendingInviteId(null);
+  }, [refreshTrips]);
 
   const handleTimeChange = useCallback((d: Date) => setCheckTime(d), []);
 
@@ -479,6 +520,7 @@ export function App() {
           onClose={() => { setTripOpen(false); setTripLoadData(undefined); refreshTrips(); }}
           loadTrip={tripLoadData}
           inline
+          user={user}
         />
       </div>
 
@@ -536,6 +578,7 @@ export function App() {
           lists={myLists}
           onClose={() => { setTripOpen(false); setTripLoadData(undefined); refreshTrips(); }}
           loadTrip={tripLoadData}
+          user={user}
         />
       )}
 
@@ -545,6 +588,17 @@ export function App() {
           categoryMap={categoryMap}
           onClose={() => setImportOpen(false)}
           onDone={handleImportDone}
+        />
+      )}
+
+      {/* Trip invite join flow */}
+      {pendingInviteId && (
+        <TripInviteJoin
+          inviteId={pendingInviteId}
+          isLoggedIn={!!user}
+          onLogin={signInWithGoogle}
+          onJoined={handleInviteJoined}
+          onCancel={() => { setPendingInviteId(null); window.location.hash = ''; }}
         />
       )}
     </div>

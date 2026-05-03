@@ -11,10 +11,18 @@ import type { RouteSuggestion } from './TripSuggestion';
 import { supabase } from '../lib/supabase';
 import { saveTripAsync, updateTripAsync, type SavedTrip } from '../lib/tripStorage';
 import { useTimeline } from '../hooks/useTimeline';
+import { useTripRealtime } from '../hooks/useTripRealtime';
+import { useTripPresence } from '../hooks/useTripPresence';
 import { fetchListShopIds } from '../lib/api';
+import { fetchTripMembers, removeTripMember } from '../lib/tripCollabApi';
 import type { List } from '../types/list';
+import type { TripMember, TripRole } from '../types/trip';
+import type { User } from '@supabase/supabase-js';
 import { TimeRangePicker } from './TimeRangePicker';
 import { MobileDrawer } from './MobileDrawer';
+import { EditorAvatars } from './EditorAvatars';
+import { TripShareButton } from './TripShareButton';
+import { TripMemberList } from './TripMemberList';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
@@ -33,6 +41,7 @@ interface Props {
   onClose: () => void;
   loadTrip?: SavedTrip;
   inline?: boolean;
+  user?: User | null;
 }
 
 function TripMapInner({ shops, tripDate, onAddShop, onRemoveShop, selectedShopIds, editMode, orderedStops, userLoc, onLocate, activeShopId, onSetActiveShop }: {
@@ -355,11 +364,45 @@ function TripMapInner({ shops, tripDate, onAddShop, onRemoveShop, selectedShopId
   );
 }
 
-export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inline }: Props) {
+export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inline, user }: Props) {
   // Filter state
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
+
+  // Collaborative state
+  const isCollab = loadTrip?.isCollaborative ?? false;
+  const [collabEnabled, setCollabEnabled] = useState(isCollab);
+  const [members, setMembers] = useState<TripMember[]>([]);
+  const [myRole, setMyRole] = useState<TripRole>('owner');
+  const [showMembers, setShowMembers] = useState(false);
+
+  // Realtime hooks (only active when collaborative)
+  const rt = useTripRealtime(loadTrip?.id ?? null, collabEnabled);
+  const presenceUser = useMemo(() => {
+    if (!user) return null;
+    const meta = user.user_metadata;
+    return {
+      userId: user.id,
+      displayName: meta?.full_name || meta?.name || '',
+      avatarUrl: meta?.avatar_url || meta?.picture || '',
+    };
+  }, [user]);
+  const activeEditors = useTripPresence(loadTrip?.id ?? null, collabEnabled, presenceUser);
+
+  // Load members for collaborative trips
+  useEffect(() => {
+    if (!collabEnabled || !loadTrip?.id) return;
+    fetchTripMembers(loadTrip.id).then(m => {
+      setMembers(m);
+      if (user) {
+        const me = m.find(mem => mem.userId === user.id);
+        if (me) setMyRole(me.role);
+      }
+    }).catch(console.error);
+  }, [collabEnabled, loadTrip?.id, user]);
+
+  const canEdit = myRole === 'owner' || myRole === 'editor';
 
   // Filtered shops for map display
   const displayShops = useMemo(() => {
@@ -410,15 +453,20 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [activeShopId, setActiveShopId] = useState<number | null>(null);
 
+  // When collaborative, use realtime data; otherwise local state
+  const effectiveShopIds = collabEnabled ? rt.shopIds : orderedShopIds;
+  const effectiveVisitedIds = collabEnabled ? rt.visitedIds : visitedIds;
+  const effectiveShopDurations = collabEnabled ? rt.shopDurations : shopDurations;
+
   // Ordered shops for route drawing
   const orderedStops = useMemo(() => {
-    return orderedShopIds
+    return effectiveShopIds
       .map(id => shops.find(s => s.id === id))
       .filter((s): s is Shop => s !== null && s !== undefined && !!s.lat && !!s.lng);
-  }, [orderedShopIds, shops]);
+  }, [effectiveShopIds, shops]);
 
   // Derived: selectedShopIds as Set for quick lookup
-  const selectedShopIds = useMemo(() => new Set(orderedShopIds), [orderedShopIds]);
+  const selectedShopIds = useMemo(() => new Set(effectiveShopIds), [effectiveShopIds]);
 
   // Computed JST date for the trip
   const tripDateJST = useMemo(() => {
@@ -434,7 +482,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
 
   // Build trip stops with open window info (preserve order)
   const stops = useMemo((): TripStop[] => {
-    return orderedShopIds.map(id => {
+    return effectiveShopIds.map(id => {
       const shop = shops.find(s => s.id === id);
       if (!shop) return null;
 
@@ -443,10 +491,10 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
         shop,
         openWindow: result?.closed === false ? result.window : null,
         closed: result?.closed === true,
-        visited: visitedIds.has(id),
+        visited: effectiveVisitedIds.has(id),
       };
     }).filter((s): s is TripStop => s !== null);
-  }, [orderedShopIds, shops, tripDateJST, visitedIds]);
+  }, [effectiveShopIds, shops, tripDateJST, effectiveVisitedIds]);
 
   // Split into active and closed
   const activeStops = useMemo(() => stops.filter(s => !s.closed), [stops]);
@@ -457,7 +505,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
 
   // Timeline calculation
   const hasTimeWindow = startTime !== '' && endTime !== '';
-  const timeline = useTimeline(clusters, startTime, shopDurations);
+  const timeline = useTimeline(clusters, startTime, effectiveShopDurations);
 
   // Feasibility (only when time window is set)
   const feasibility = useMemo(() => {
@@ -470,7 +518,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
     // Use actual durations from shopDurations map
     let shopTime = 0;
     for (const stop of activeStops) {
-      shopTime += shopDurations.get(stop.shop.id) ?? stop.shop.visitDuration ?? 20;
+      shopTime += effectiveShopDurations.get(stop.shop.id) ?? stop.shop.visitDuration ?? 20;
     }
     let walkTime = 0;
     for (let i = 0; i < clusters.length - 1; i++) {
@@ -483,52 +531,76 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
 
   // Handle duration change
   const handleDurationChange = useCallback((shopId: number, duration: number) => {
-    setShopDurations(prev => {
-      const next = new Map(prev);
-      // Find shop's default duration
+    if (collabEnabled) {
       const shop = shops.find(s => s.id === shopId);
       const defaultDur = shop?.visitDuration ?? 20;
-      if (duration === defaultDur) next.delete(shopId); // back to default, remove override
-      else next.set(shopId, duration);
-      return next;
-    });
-  }, [shops]);
+      rt.updateDuration(shopId, duration === defaultDur ? null : duration);
+    } else {
+      setShopDurations(prev => {
+        const next = new Map(prev);
+        const shop = shops.find(s => s.id === shopId);
+        const defaultDur = shop?.visitDuration ?? 20;
+        if (duration === defaultDur) next.delete(shopId);
+        else next.set(shopId, duration);
+        return next;
+      });
+    }
+  }, [shops, collabEnabled, rt]);
 
   const [lastAdded, setLastAdded] = useState<string | null>(null);
 
   const handleAddShop = useCallback((shop: Shop) => {
-    setOrderedShopIds(prev => prev.includes(shop.id) ? prev : [...prev, shop.id]);
+    if (collabEnabled) {
+      rt.addShop(shop.id);
+    } else {
+      setOrderedShopIds(prev => prev.includes(shop.id) ? prev : [...prev, shop.id]);
+    }
     setLastAdded(shop.name);
     setTimeout(() => setLastAdded(null), 1500);
-  }, []);
+  }, [collabEnabled, rt]);
 
   const handleImportFromList = useCallback(async (listId: string) => {
     const shopIds = await fetchListShopIds(listId);
-    setOrderedShopIds(prev => {
-      const existing = new Set(prev);
-      const newIds = [...shopIds].filter(id => !existing.has(id));
-      return [...prev, ...newIds];
-    });
+    if (collabEnabled) {
+      const existing = new Set(effectiveShopIds);
+      for (const id of shopIds) {
+        if (!existing.has(id)) await rt.addShop(id);
+      }
+    } else {
+      setOrderedShopIds(prev => {
+        const existing = new Set(prev);
+        const newIds = [...shopIds].filter(id => !existing.has(id));
+        return [...prev, ...newIds];
+      });
+    }
     setImportListOpen(false);
-  }, []);
+  }, [collabEnabled, effectiveShopIds, rt]);
 
   const handleRemoveShop = useCallback((shopId: number) => {
-    setOrderedShopIds(prev => prev.filter(id => id !== shopId));
-  }, []);
+    if (collabEnabled) {
+      rt.removeShop(shopId);
+    } else {
+      setOrderedShopIds(prev => prev.filter(id => id !== shopId));
+    }
+  }, [collabEnabled, rt]);
 
   // Toggle visited
   const handleToggleVisited = useCallback((shopId: number) => {
-    setVisitedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(shopId)) next.delete(shopId);
-      else next.add(shopId);
-      // Auto-save if trip is saved
-      if (savedId) {
-        updateTripAsync(savedId, { visitedIds: [...next] }).catch(console.error);
-      }
-      return next;
-    });
-  }, [savedId]);
+    if (collabEnabled) {
+      rt.toggleVisited(shopId);
+    } else {
+      setVisitedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(shopId)) next.delete(shopId);
+        else next.add(shopId);
+        // Auto-save if trip is saved
+        if (savedId) {
+          updateTripAsync(savedId, { visitedIds: [...next] }).catch(console.error);
+        }
+        return next;
+      });
+    }
+  }, [savedId, collabEnabled, rt]);
 
   // Reorder clusters (swap entire cluster groups in orderedShopIds)
   const handleReorderClusters = useCallback((fromIdx: number, toIdx: number) => {
@@ -542,11 +614,15 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
       for (const stop of cluster.stops) newOrder.push(stop.shop.id);
     }
     // Add closed/unknown shops at the end
-    for (const id of orderedShopIds) {
+    for (const id of effectiveShopIds) {
       if (!newOrder.includes(id)) newOrder.push(id);
     }
-    setOrderedShopIds(newOrder);
-  }, [clusters, orderedShopIds]);
+    if (collabEnabled) {
+      rt.reorder(newOrder);
+    } else {
+      setOrderedShopIds(newOrder);
+    }
+  }, [clusters, effectiveShopIds, collabEnabled, rt]);
 
   // Reorder shop within a cluster
   const handleReorderShopInCluster = useCallback((clusterIdx: number, fromIdx: number, toIdx: number) => {
@@ -557,30 +633,39 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
     shopIds.splice(toIdx, 0, moved);
 
     // Rebuild full order: replace this cluster's segment
-    const newOrder = [...orderedShopIds];
+    const newOrder = [...effectiveShopIds];
     const clusterIdSet = new Set(cluster.stops.map(s => s.shop.id));
     const filtered = newOrder.filter(id => !clusterIdSet.has(id));
 
     // Find where to insert (position of first shop of this cluster in original order)
     const firstOrigIdx = newOrder.findIndex(id => clusterIdSet.has(id));
     filtered.splice(firstOrigIdx, 0, ...shopIds);
-    setOrderedShopIds(filtered);
-  }, [clusters, orderedShopIds]);
+    if (collabEnabled) {
+      rt.reorder(filtered);
+    } else {
+      setOrderedShopIds(filtered);
+    }
+  }, [clusters, effectiveShopIds, collabEnabled, rt]);
 
   // Save trip
   const handleSave = useCallback(async () => {
     const durObj: Record<string, number> = {};
-    shopDurations.forEach((v, k) => { durObj[String(k)] = v; });
+    effectiveShopDurations.forEach((v, k) => { durObj[String(k)] = v; });
 
     if (savedId) {
-      await updateTripAsync(savedId, {
-        tripDate,
-        startTime,
-        endTime,
-        shopIds: orderedShopIds,
-        visitedIds: [...visitedIds],
-        shopDurations: durObj,
-      });
+      if (collabEnabled) {
+        // Collaborative: only save metadata (shop items are already persisted via realtime)
+        await updateTripAsync(savedId, { tripDate, startTime, endTime });
+      } else {
+        await updateTripAsync(savedId, {
+          tripDate,
+          startTime,
+          endTime,
+          shopIds: effectiveShopIds,
+          visitedIds: [...effectiveVisitedIds],
+          shopDurations: durObj,
+        });
+      }
     } else {
       const days = ['日', '一', '二', '三', '四', '五', '六'];
       const d = tripDateJST;
@@ -590,13 +675,13 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
         tripDate,
         startTime,
         endTime,
-        shopIds: orderedShopIds,
-        visitedIds: [...visitedIds],
+        shopIds: effectiveShopIds,
+        visitedIds: [...effectiveVisitedIds],
         shopDurations: durObj,
       });
       setSavedId(saved.id);
     }
-  }, [savedId, tripDate, startTime, endTime, orderedShopIds, visitedIds, tripDateJST, shopDurations]);
+  }, [savedId, tripDate, startTime, endTime, effectiveShopIds, effectiveVisitedIds, tripDateJST, effectiveShopDurations, collabEnabled]);
 
   // Request AI suggestion → directly reorder list + annotate
   const handleSuggest = useCallback(async () => {
@@ -669,11 +754,15 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
         if (!isNaN(id)) notes.set(id, w.message);
       }
       // Add remaining shops not in suggestion
-      for (const id of orderedShopIds) {
+      for (const id of effectiveShopIds) {
         if (!newOrder.includes(id)) newOrder.push(id);
       }
 
-      setOrderedShopIds(newOrder);
+      if (collabEnabled) {
+        rt.reorder(newOrder);
+      } else {
+        setOrderedShopIds(newOrder);
+      }
       setAiNotes(notes);
       setAiSummary(data.summary || '');
           } catch (err) {
@@ -682,7 +771,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
     } finally {
       setSuggesting(false);
     }
-  }, [hasTimeWindow, activeStops.length, stops, clusters, tripDate, tripDateJST, startTime, endTime, selectedShopIds, orderedShopIds]);
+  }, [hasTimeWindow, activeStops.length, stops, clusters, tripDate, tripDateJST, startTime, endTime, selectedShopIds, effectiveShopIds, collabEnabled, rt]);
 
   const handleSelectShop = useCallback((shopId: number) => {
     setActiveShopId(shopId);
@@ -737,7 +826,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
       <div className="shrink-0 bg-white border-b border-gray-200">
         {editMode ? (
           <div className="px-4 py-3">
-            {/* Row 1: Back + Date */}
+            {/* Row 1: Back + Date + Collab */}
             <div className="flex items-center gap-3 mb-2">
               <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1 shrink-0">
                 <span>←</span>
@@ -749,9 +838,52 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
                   value={tripDate}
                   onChange={e => setTripDate(e.target.value)}
                   className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-50"
+                  disabled={collabEnabled && !canEdit}
                 />
                 <span className="text-sm text-gray-400">週{dayLabel}</span>
               </div>
+              {/* Collaboration: avatars + share */}
+              {collabEnabled && (
+                <div className="relative">
+                  {/* Desktop avatars */}
+                  <div className="hidden sm:block">
+                    <EditorAvatars editors={activeEditors} onExpand={() => setShowMembers(v => !v)} />
+                  </div>
+                  {/* Mobile compact */}
+                  <div className="sm:hidden">
+                    <EditorAvatars editors={activeEditors} compact onExpand={() => setShowMembers(v => !v)} />
+                  </div>
+                  {showMembers && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowMembers(false)} />
+                      <div className="absolute right-0 top-full mt-1 z-50">
+                        <TripMemberList
+                          members={members}
+                          onlineUsers={activeEditors}
+                          currentUserId={user?.id ?? null}
+                          onRemove={myRole === 'owner' ? (userId) => {
+                            removeTripMember(savedId!, userId).then(() => {
+                              setMembers(prev => prev.filter(m => m.userId !== userId));
+                            });
+                          } : undefined}
+                          onClose={() => setShowMembers(false)}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              {savedId && user && (
+                <TripShareButton
+                  tripId={savedId}
+                  isCollaborative={collabEnabled}
+                  onBecameCollaborative={() => {
+                    setCollabEnabled(true);
+                    // Reload members
+                    fetchTripMembers(savedId).then(setMembers).catch(console.error);
+                  }}
+                />
+              )}
             </div>
             {/* Row 2: Time range slider */}
             <TimeRangePicker
@@ -773,8 +905,29 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
                 <span className="px-2 py-0.5 bg-gray-100 rounded text-gray-500 text-xs">{startTime}～{endTime}</span>
               )}
               <span className="text-gray-300">·</span>
-              <span className="text-gray-500">{orderedShopIds.length} 間店</span>
+              <span className="text-gray-500">{effectiveShopIds.length} 間店</span>
             </div>
+            {/* Collaboration: avatars in view mode */}
+            {collabEnabled && (
+              <>
+                <div className="hidden sm:block">
+                  <EditorAvatars editors={activeEditors} onExpand={() => setShowMembers(v => !v)} />
+                </div>
+                <div className="sm:hidden">
+                  <EditorAvatars editors={activeEditors} compact onExpand={() => setShowMembers(v => !v)} />
+                </div>
+              </>
+            )}
+            {savedId && user && (
+              <TripShareButton
+                tripId={savedId}
+                isCollaborative={collabEnabled}
+                onBecameCollaborative={() => {
+                  setCollabEnabled(true);
+                  fetchTripMembers(savedId).then(setMembers).catch(console.error);
+                }}
+              />
+            )}
           </div>
         )}
       </div>
@@ -925,14 +1078,14 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
           <TripStopList
             clusters={clusters}
             closedStops={closedStops}
-            onRemove={editMode ? handleRemoveShop : undefined}
+            onRemove={editMode && canEdit ? handleRemoveShop : undefined}
             onToggleVisited={handleToggleVisited}
-            onReorderClusters={editMode ? handleReorderClusters : undefined}
-            onReorderShopInCluster={editMode ? handleReorderShopInCluster : undefined}
-            onDurationChange={editMode ? handleDurationChange : undefined}
+            onReorderClusters={editMode && canEdit ? handleReorderClusters : undefined}
+            onReorderShopInCluster={editMode && canEdit ? handleReorderShopInCluster : undefined}
+            onDurationChange={editMode && canEdit ? handleDurationChange : undefined}
             onSelectShop={handleSelectShop}
             aiNotes={aiNotes}
-            shopDurations={shopDurations}
+            shopDurations={effectiveShopDurations}
             timeline={timeline}
             stopDistances={!editMode ? stopDistances : undefined}
             totalStops={stops.length}
@@ -978,7 +1131,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
                   </button>
                 )}
               </>
-            ) : (
+            ) : canEdit ? (
               <button
                 onClick={() => setEditMode(true)}
                 className="w-full py-2.5 rounded-lg bg-gray-100 text-gray-600 text-sm font-medium
@@ -986,7 +1139,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
               >
                 編輯行程
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -1007,14 +1160,14 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
             <TripStopList
               clusters={clusters}
               closedStops={closedStops}
-              onRemove={editMode ? handleRemoveShop : undefined}
+              onRemove={editMode && canEdit ? handleRemoveShop : undefined}
               onToggleVisited={handleToggleVisited}
-              onReorderClusters={editMode ? handleReorderClusters : undefined}
-              onReorderShopInCluster={editMode ? handleReorderShopInCluster : undefined}
-              onDurationChange={editMode ? handleDurationChange : undefined}
+              onReorderClusters={editMode && canEdit ? handleReorderClusters : undefined}
+              onReorderShopInCluster={editMode && canEdit ? handleReorderShopInCluster : undefined}
+              onDurationChange={editMode && canEdit ? handleDurationChange : undefined}
               onSelectShop={handleSelectShop}
               aiNotes={aiNotes}
-              shopDurations={shopDurations}
+              shopDurations={effectiveShopDurations}
               timeline={timeline}
               stopDistances={!editMode ? stopDistances : undefined}
               totalStops={stops.length}
@@ -1046,7 +1199,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
                   </button>
                 )}
               </>
-            ) : (
+            ) : canEdit ? (
               <button
                 onClick={() => setEditMode(true)}
                 className="w-full py-2.5 rounded-lg bg-gray-100 text-gray-600 text-sm font-medium
@@ -1054,7 +1207,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
               >
                 編輯行程
               </button>
-            )}
+            ) : null}
           </div>
         </MobileDrawer>
 

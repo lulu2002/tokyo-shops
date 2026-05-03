@@ -43,3 +43,46 @@ export interface StopTimeline {
   willBeClosed: boolean;
   minutesUntilClose: number;
 }
+
+// ============================================
+// Collaborative trip types
+// ============================================
+
+export type TripRole = 'owner' | 'editor' | 'viewer';
+
+export interface TripMember {
+  id: string;
+  tripId: string;
+  userId: string;
+  role: TripRole;
+  joinedAt: string;
+  // joined from user_profiles
+  displayName?: string;
+  avatarUrl?: string;
+}
+
+export interface TripInvite {
+  id: string;
+  tripId: string;
+  createdBy: string;
+  role: 'editor' | 'viewer';
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface TripShopItem {
+  id: string;
+  tripId: string;
+  shopId: number;
+  sortOrder: number;
+  visited: boolean;
+  durationOverride: number | null;
+  addedBy: string | null;
+  createdAt: string;
+}
+
+export interface PresenceUser {
+  userId: string;
+  displayName: string;
+  avatarUrl: string;
+}
