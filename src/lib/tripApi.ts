@@ -11,6 +11,7 @@ export interface DbTrip {
   visited_ids: number[];
   shop_durations: Record<string, number>;
   ai_notes: Record<string, string>;
+  is_collaborative: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -26,6 +27,7 @@ export interface Trip {
   visitedIds: number[];
   shopDurations: Record<string, number>;
   aiNotes: Record<string, string>;
+  isCollaborative: boolean;
   createdAt: string;
 }
 
@@ -41,18 +43,48 @@ function mapTrip(db: DbTrip): Trip {
     visitedIds: db.visited_ids || [],
     shopDurations: db.shop_durations || {},
     aiNotes: db.ai_notes || {},
+    isCollaborative: db.is_collaborative ?? false,
     createdAt: db.created_at,
   };
 }
 
 export async function fetchMyTrips(userId: string): Promise<Trip[]> {
-  const { data, error } = await supabase
-    .from('trips')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data || []).map(mapTrip);
+  // Fetch owned trips + trips where user is a member
+  const [owned, memberOf] = await Promise.all([
+    supabase
+      .from('trips')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('trip_members')
+      .select('trip_id')
+      .eq('user_id', userId),
+  ]);
+  if (owned.error) throw owned.error;
+
+  const ownedTrips = (owned.data || []).map(mapTrip);
+  const ownedIds = new Set(ownedTrips.map(t => t.id));
+
+  // Fetch member trips not already in owned
+  if (memberOf.data && memberOf.data.length > 0) {
+    const memberTripIds = memberOf.data
+      .map(m => m.trip_id as string)
+      .filter(id => !ownedIds.has(id));
+
+    if (memberTripIds.length > 0) {
+      const { data: memberTrips } = await supabase
+        .from('trips')
+        .select('*')
+        .in('id', memberTripIds)
+        .order('created_at', { ascending: false });
+      if (memberTrips) {
+        return [...ownedTrips, ...memberTrips.map(mapTrip)];
+      }
+    }
+  }
+
+  return ownedTrips;
 }
 
 export async function createTrip(userId: string, trip: {
