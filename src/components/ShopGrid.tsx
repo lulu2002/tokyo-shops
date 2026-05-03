@@ -7,7 +7,7 @@ interface Props {
   onSelect: (shop: Shop) => void;
   openStatusMap: Map<number, boolean | null>;
   distanceMap: Map<number, number>;
-  viewMode: 'grid' | 'list';
+  viewMode: 'grid' | 'list' | 'map';
   shopInListSet?: Set<number>;
   onHeart?: (shop: Shop) => void;
   shopListTags?: Map<number, { listId: string; listName: string }[]>;

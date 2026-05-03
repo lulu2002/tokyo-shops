@@ -24,4 +24,5 @@ export interface Shop {
   editorial?: string;
   reviewText?: string;
   hours?: string[];
+  visitDuration: number;
 }

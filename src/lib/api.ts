@@ -21,6 +21,7 @@ interface DbShop {
   website: string;
   google_maps_url: string;
   hours: string[];
+  visit_duration: number;
   shop_categories: { categories: { id: number; slug: string; name: string; label: string; color: string } }[];
 }
 
@@ -66,6 +67,7 @@ function mapShop(db: DbShop): Shop {
     website: db.website,
     googleMapsUrl: db.google_maps_url,
     hours: db.hours,
+    visitDuration: db.visit_duration || 20,
   };
 }
 

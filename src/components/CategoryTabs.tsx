@@ -4,8 +4,8 @@ interface Props {
   activeCategory: string | null;
   onSelect: (key: string | null) => void;
   counts: Record<string, number>;
-  viewMode: 'grid' | 'list';
-  onViewModeChange: (mode: 'grid' | 'list') => void;
+  viewMode: 'grid' | 'list' | 'map';
+  onViewModeChange: (mode: 'grid' | 'list' | 'map') => void;
   categories: Category[];
 }
 
@@ -33,6 +33,15 @@ export function CategoryTabs({ activeCategory, onSelect, counts, viewMode, onVie
             title="清單模式"
           >
             ☰
+          </button>
+          <button
+            onClick={() => onViewModeChange('map')}
+            className={`hidden sm:block px-2 py-1.5 text-sm transition-colors ${
+              viewMode === 'map' ? 'bg-gray-900 text-white' : 'bg-white text-gray-400 hover:text-gray-600'
+            }`}
+            title="地圖模式"
+          >
+            ⌖
           </button>
         </div>
 

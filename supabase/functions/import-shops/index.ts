@@ -227,8 +227,11 @@ Deno.serve(async (req) => {
       let query = url;
       // Try to extract place name from URL
       const placeMatch = url.match(/\/place\/([^/@]+)/);
+      const searchMatch = url.match(/\/search\/([^/@?]+)/);
       if (placeMatch) {
         query = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
+      } else if (searchMatch) {
+        query = decodeURIComponent(searchMatch[1].replace(/\+/g, " "));
       } else {
         // Try CID-based URL - search by coordinates if available
         const coordMatch = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);

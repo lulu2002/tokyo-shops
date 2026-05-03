@@ -20,6 +20,7 @@ export interface ImportPreview {
   subcategory?: string;
   specialty?: string;
   description?: string;
+  visitDuration?: number;
 }
 
 export async function resolveUrls(
@@ -87,6 +88,7 @@ export async function classifyShops(
         subcategory: cls.subcategory,
         specialty: cls.specialty,
         description: cls.description,
+        visitDuration: cls.visitDuration || 30,
       };
     }
     return shop;
@@ -120,6 +122,7 @@ export async function saveImportedShops(
       website: shop.website,
       google_maps_url: shop.googleMapsUrl,
       hours: shop.hours,
+      visit_duration: shop.visitDuration || 30,
     }).select('id').single();
 
     if (error || !data) continue;

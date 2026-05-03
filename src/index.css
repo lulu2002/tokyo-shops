@@ -1,9 +1,35 @@
 @import "tailwindcss";
 
+/* Google Maps Places Autocomplete dropdown fix */
+.pac-container {
+  z-index: 10000 !important;
+}
+gmp-place-autocomplete {
+  z-index: 10000;
+}
+gmp-place-autocomplete::part(suggestions) {
+  z-index: 10000 !important;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Safe area for bottom nav on iOS */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Hide on mobile only (below 640px) */
+.mobile-hidden {
+  display: none !important;
+}
+@media (min-width: 640px) {
+  .mobile-hidden {
+    display: revert !important;
+  }
 }

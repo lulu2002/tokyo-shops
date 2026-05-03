@@ -5,4 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   base: '/tokyo-shops/',
   plugins: [react(), tailwindcss()],
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
 })

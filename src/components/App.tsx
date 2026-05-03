@@ -10,6 +10,11 @@ import { ListDrawer } from './ListDrawer';
 import { ListTagBar } from './ListTagBar';
 import { ImportModal } from './ImportModal';
 import { ListPicker } from './ListPicker';
+import { MapView } from './MapView';
+import { TripPlanner } from './TripPlanner';
+import { listTrips, deleteTrip, type SavedTrip } from '../lib/tripStorage';
+import { BottomNav } from './BottomNav';
+import { TripListView } from './TripListView';
 import { isOpenAt, toJST } from '../utils/openStatus';
 import { haversine } from '../utils/distance';
 import {
@@ -27,6 +32,11 @@ interface UserLocation {
 export function App() {
   const { user, isAdmin, signInWithGoogle, signOut } = useAuth();
   const [importOpen, setImportOpen] = useState(false);
+  const [tripOpen, setTripOpen] = useState(false);
+  const [tripSource, setTripSource] = useState<'mobile' | 'desktop'>('desktop');
+  const [tripLoadData, setTripLoadData] = useState<SavedTrip | undefined>();
+  const [tripListOpen, setTripListOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'explore' | 'map' | 'trip' | 'lists'>('explore');
 
   // Data
   const [shops, setShops] = useState<Shop[]>([]);
@@ -43,8 +53,8 @@ export function App() {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locating, setLocating] = useState(false);
   const [sortByDistance, setSortByDistance] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
-    try { const v = localStorage.getItem('pref:viewMode'); return v === 'list' ? 'list' : 'grid'; } catch { return 'grid'; }
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'map'>(() => {
+    try { const v = localStorage.getItem('pref:viewMode'); if (v === 'list' || v === 'map') return v; return 'grid'; } catch { return 'grid'; }
   });
 
   // Lists
@@ -119,7 +129,7 @@ export function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, [categories, parseHash]);
 
-  const persistViewMode = useCallback((mode: 'grid' | 'list') => {
+  const persistViewMode = useCallback((mode: 'grid' | 'list' | 'map') => {
     setViewMode(mode);
     try { localStorage.setItem('pref:viewMode', mode); } catch {}
   }, []);
@@ -285,6 +295,23 @@ export function App() {
     window.scrollTo({ top: 0 });
   }, [categories, listFilterActive]);
 
+  // Determine effective view for mobile (bottom nav controls view)
+  const isMobileMap = mobileTab === 'map';
+  const isMobileTrip = mobileTab === 'trip';
+  const isMobileLists = mobileTab === 'lists';
+
+  const handleMobileTab = useCallback((tab: 'explore' | 'map' | 'trip' | 'lists') => {
+    setMobileTab(tab);
+    if (tab === 'map') {
+      persistViewMode('map');
+    } else if (tab === 'explore') {
+      // Always reset to grid/list when going to explore (not map)
+      if (viewMode === 'map') persistViewMode('grid');
+    } else if (tab === 'lists') {
+      setDrawerOpen(true);
+    }
+  }, [viewMode, persistViewMode]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -294,14 +321,55 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-6 flex items-start justify-between">
+    <div className="min-h-screen bg-gray-50 pb-14 sm:pb-0">
+      {/* Header */}
+      <header className={`bg-white border-b border-gray-200 ${isMobileTrip ? 'mobile-hidden' : ''}`}>
+        <div className="max-w-7xl mx-auto px-4 py-3 sm:py-6 flex items-center sm:items-start justify-between">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">東京專門店地圖</h1>
-            <p className="text-sm text-gray-500 mt-1">98 個領域 · {shops.length} 間店</p>
+            <h1 className="text-lg sm:text-3xl font-bold text-gray-900">東京專門店地圖</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1 hidden sm:block">98 個領域 · {shops.length} 間店</p>
           </div>
           <div className="flex items-center gap-2">
+            {/* Desktop: trip dropdown */}
+            <div className="relative hidden sm:block">
+              <button
+                onClick={() => setTripListOpen(v => !v)}
+                className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-sm font-medium hover:bg-emerald-100 transition-colors"
+              >
+                規劃行程
+              </button>
+              {tripListOpen && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                  <button
+                    onClick={() => { setTripLoadData(undefined); setTripOpen(true); setTripSource('desktop'); setTripListOpen(false); }}
+                    className="w-full px-4 py-3 text-left text-sm font-medium text-emerald-600 hover:bg-emerald-50 border-b border-gray-100"
+                  >
+                    + 新行程
+                  </button>
+                  {listTrips().length > 0 && (
+                    <div className="max-h-48 overflow-y-auto">
+                      {listTrips().map(trip => (
+                        <div key={trip.id} className="flex items-center hover:bg-gray-50">
+                          <button
+                            onClick={() => { setTripLoadData(trip); setTripOpen(true); setTripSource('desktop'); setTripListOpen(false); }}
+                            className="flex-1 px-4 py-2.5 text-left"
+                          >
+                            <div className="text-sm font-medium text-gray-800">{trip.name}</div>
+                            <div className="text-xs text-gray-400">{trip.shopIds.length} 間店</div>
+                          </button>
+                          <button
+                            onClick={() => { deleteTrip(trip.id); setTripListOpen(v => !v); setTimeout(() => setTripListOpen(v => !v), 0); }}
+                            className="px-3 py-2 text-gray-300 hover:text-red-400 text-xs"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             {isAdmin && (
               <button
                 onClick={() => setImportOpen(true)}
@@ -315,50 +383,102 @@ export function App() {
         </div>
       </header>
 
-      <TimeBar
-        checkTime={checkTime}
-        onTimeChange={handleTimeChange}
-        openCount={openCount}
-        totalCount={filtered.length}
-        showOnlyOpen={showOnlyOpen}
-        onToggleFilter={persistShowOnlyOpen}
-        userLocation={userLocation}
-        locating={locating}
-        sortByDistance={sortByDistance}
-        onLocate={handleLocate}
-        onToggleSortDistance={() => setSortByDistance((v) => !v)}
-      />
-
-      {(user || publicLists.length > 0) && (
-        <ListTagBar
-          activeListIds={activeListIds}
-          allLists={[...myLists, ...publicLists]}
-          onToggleList={handleToggleList}
-          onOpenDrawer={() => setDrawerOpen(true)}
+      {/* TimeBar */}
+      <div className={(isMobileMap || isMobileTrip) ? 'mobile-hidden' : ''}>
+        <TimeBar
+          checkTime={checkTime}
+          onTimeChange={handleTimeChange}
+          openCount={openCount}
+          totalCount={filtered.length}
+          showOnlyOpen={showOnlyOpen}
+          onToggleFilter={persistShowOnlyOpen}
+          userLocation={userLocation}
+          locating={locating}
+          sortByDistance={sortByDistance}
+          onLocate={handleLocate}
+          onToggleSortDistance={() => setSortByDistance((v) => !v)}
         />
+      </div>
+
+      {/* ListTagBar — hide on mobile in map/trip/lists mode */}
+      {(user || publicLists.length > 0) && (
+        <div className={(isMobileMap || isMobileTrip || isMobileLists) ? 'mobile-hidden' : ''}>
+          <ListTagBar
+            activeListIds={activeListIds}
+            allLists={[...myLists, ...publicLists]}
+            onToggleList={handleToggleList}
+            onOpenDrawer={() => setDrawerOpen(true)}
+          />
+        </div>
       )}
 
-      <CategoryTabs
-        activeCategory={activeCategory}
-        onSelect={handleSelectCategory}
-        counts={counts}
-        viewMode={viewMode}
-        onViewModeChange={persistViewMode}
-        categories={categories}
-      />
-
-      <main className="max-w-7xl mx-auto">
-        <ShopGrid
-          shops={filtered}
-          onSelect={setSelectedShop}
-          openStatusMap={openStatusMap}
-          distanceMap={distanceMap}
+      {/* CategoryTabs */}
+      <div className={(isMobileMap || isMobileTrip) ? 'mobile-hidden' : ''}>
+        <CategoryTabs
+          activeCategory={activeCategory}
+          onSelect={handleSelectCategory}
+          counts={counts}
           viewMode={viewMode}
-          shopInListSet={user ? shopInListSet : undefined}
-          onHeart={user ? handleHeartFromList : undefined}
-          shopListTags={listFilterActive ? selectedListShopMap : undefined}
+          onViewModeChange={persistViewMode}
+          categories={categories}
         />
+      </div>
+
+      {/* Main content — explore/map */}
+      <main className={`${viewMode === 'map' ? '' : 'max-w-7xl mx-auto'} ${isMobileTrip ? 'mobile-hidden' : ''}`}>
+        {viewMode === 'map' ? (
+          <MapView
+            shops={filtered}
+            onSelect={setSelectedShop}
+            openStatusMap={openStatusMap}
+            distanceMap={distanceMap}
+            isAdmin={isAdmin}
+            categoryMap={categoryMap}
+            onImportDone={handleImportDone}
+          />
+        ) : (
+          <ShopGrid
+            shops={filtered}
+            onSelect={setSelectedShop}
+            openStatusMap={openStatusMap}
+            distanceMap={distanceMap}
+            viewMode={viewMode}
+            shopInListSet={user ? shopInListSet : undefined}
+            onHeart={user ? handleHeartFromList : undefined}
+            shopListTags={listFilterActive ? selectedListShopMap : undefined}
+          />
+        )}
       </main>
+
+      {/* Mobile trip tab: list view (when no trip open) */}
+      <div className="sm:!hidden" style={{ display: isMobileTrip && !tripOpen ? '' : 'none' }}>
+        <div className="max-w-lg mx-auto">
+          <TripListView
+            onSelectTrip={(trip) => { setTripLoadData(trip); setTripOpen(true); setTripSource('mobile'); }}
+            onNewTrip={() => { setTripLoadData(undefined); setTripOpen(true); setTripSource('mobile'); }}
+          />
+        </div>
+      </div>
+
+      {/* Mobile trip tab: planner (stays mounted, hidden via display) */}
+      <div className="sm:!hidden" style={{ display: isMobileTrip && tripOpen ? '' : 'none' }}>
+        <TripPlanner
+          key={`mobile-${tripLoadData?.id ?? 'new'}`}
+          shops={shops}
+          categories={categories}
+          onClose={() => { setTripOpen(false); setTripLoadData(undefined); }}
+          loadTrip={tripLoadData}
+          inline
+        />
+      </div>
+
+      {/* Bottom Nav — mobile only */}
+      <BottomNav
+        active={mobileTab}
+        onChange={handleMobileTab}
+        tripCount={listTrips().length}
+        listCount={myLists.length}
+      />
 
       {selectedShop && (
         <ShopDetail
@@ -394,6 +514,17 @@ export function App() {
           onToggle={handleToggleListItem}
           onCreate={handleCreateList}
           onClose={() => setPickerShopId(null)}
+        />
+      )}
+
+      {/* Desktop-only trip planner overlay */}
+      {tripOpen && tripSource === 'desktop' && (
+        <TripPlanner
+          key={`desktop-${tripLoadData?.id ?? 'new'}`}
+          shops={shops}
+          categories={categories}
+          onClose={() => { setTripOpen(false); setTripLoadData(undefined); }}
+          loadTrip={tripLoadData}
         />
       )}
 

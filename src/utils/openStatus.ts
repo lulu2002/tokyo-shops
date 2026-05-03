@@ -26,7 +26,7 @@ function parseTime(s: string): number {
   return parseInt(m[1]) * 60 + parseInt(m[2]);
 }
 
-function parseDayHours(line: string): DaySchedule | null {
+export function parseDayHours(line: string): DaySchedule | null {
   const colonIdx = line.indexOf(':');
   if (colonIdx === -1) return null;
 

@@ -36,6 +36,7 @@ create table shops (
   website text not null default '',
   google_maps_url text not null default '',
   hours text[] not null default '{}',
+  visit_duration integer not null default 30,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
