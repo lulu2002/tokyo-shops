@@ -51,7 +51,7 @@ export function useTripPresence(
     channelRef.current = channel;
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
       channelRef.current = null;
     };
   }, [tripId, enabled, currentUser?.userId]);
