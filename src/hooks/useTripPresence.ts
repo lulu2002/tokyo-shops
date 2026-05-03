@@ -17,7 +17,7 @@ export function useTripPresence(
       return;
     }
 
-    const channel = supabase.channel(`trip-presence:${tripId}`);
+    const channel = supabase.channel(`trip-presence:${tripId}:${Date.now()}`);
 
     channel
       .on('presence', { event: 'sync' }, () => {
