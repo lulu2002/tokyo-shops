@@ -36,7 +36,13 @@ export function AdminPanel({ currentUserId, onClose }: Props) {
       console.error('Failed to load admins:', error);
       return;
     }
-    setAdmins(data || []);
+    setAdmins((data || []).map((r: Record<string, unknown>) => ({
+      user_id: r.out_user_id as string,
+      email: r.out_email as string,
+      display_name: r.out_display_name as string,
+      avatar_url: r.out_avatar_url as string,
+      created_at: r.out_created_at as string,
+    })));
     setLoading(false);
   }, []);
 
@@ -51,7 +57,12 @@ export function AdminPanel({ currentUserId, onClose }: Props) {
         search_email: searchEmail.trim(),
       });
       if (error) throw error;
-      setSearchResults(data || []);
+      setSearchResults((data || []).map((r: Record<string, unknown>) => ({
+        id: r.out_id as string,
+        email: r.out_email as string,
+        display_name: r.out_display_name as string,
+        avatar_url: r.out_avatar_url as string,
+      })));
     } catch (err) {
       console.error('Search failed:', err);
     } finally {

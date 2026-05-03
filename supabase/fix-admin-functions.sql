@@ -1,19 +1,6 @@
--- ============================================
--- Admin management: allow admins to add/remove other admins
--- ============================================
+-- Fix: rename return columns to avoid PL/pgSQL ambiguity
+-- Just re-run these two functions (CREATE OR REPLACE)
 
--- Admin can insert new admins
-create policy "admin_insert" on admin_users for insert
-  with check (exists (select 1 from admin_users where user_id = auth.uid()));
-
--- Admin can remove other admins (but not themselves for safety)
-create policy "admin_delete" on admin_users for delete
-  using (exists (select 1 from admin_users where user_id = auth.uid()));
-
--- ============================================
--- RPC: search auth.users by email (admin only)
--- Client can't query auth.users directly, so we use SECURITY DEFINER
--- ============================================
 create or replace function search_users_by_email(search_email text)
 returns table (
   out_id uuid,
@@ -22,7 +9,6 @@ returns table (
   out_avatar_url text
 ) as $$
 begin
-  -- Only admins can search
   if not exists (select 1 from admin_users au where au.user_id = auth.uid()) then
     raise exception 'Not authorized';
   end if;
@@ -40,9 +26,6 @@ begin
 end;
 $$ language plpgsql security definer stable;
 
--- ============================================
--- RPC: list current admins with profile info
--- ============================================
 create or replace function list_admins()
 returns table (
   out_user_id uuid,
@@ -52,7 +35,6 @@ returns table (
   out_created_at timestamptz
 ) as $$
 begin
-  -- Only admins can list
   if not exists (select 1 from admin_users au where au.user_id = auth.uid()) then
     raise exception 'Not authorized';
   end if;
