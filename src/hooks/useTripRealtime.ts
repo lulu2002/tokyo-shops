@@ -109,7 +109,7 @@ export function useTripRealtime(tripId: string | null, enabled: boolean): UseTri
     channelRef.current = channel;
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(channel);
       channelRef.current = null;
     };
   }, [tripId, enabled]);

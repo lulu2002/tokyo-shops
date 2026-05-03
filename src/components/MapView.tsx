@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap, type MapMouseEvent } from '@vis.gl/react-google-maps';
 import type { Shop } from '../types/shop';
 import { classifyShops, saveImportedShops, type ImportPreview } from '../lib/importShops';
 import { supabase } from '../lib/supabase';
@@ -172,6 +172,69 @@ function MapInner({ shops, onSelect, openStatusMap, isAdmin, categoryMap, onImpo
     setSaveStatus('idle');
   }, []);
 
+  // Handle clicking a Google Maps POI
+  const [poiLoading, setPoiLoading] = useState(false);
+
+  const handleClickPoi = useCallback(async (placeId: string, latLng: google.maps.LatLngLiteral) => {
+    if (poiLoading || saving) return;
+
+    // Check if it's an existing shop at this location
+    const existing = shops.find(s =>
+      s.lat && s.lng && Math.abs(s.lat - latLng.lat) < 0.0001 && Math.abs(s.lng - latLng.lng) < 0.0001
+    );
+    if (existing) {
+      setActiveShopId(existing.id);
+      setSearchPreview(null);
+      return;
+    }
+
+    setPoiLoading(true);
+    setActiveShopId(null);
+
+    try {
+      const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
+      const place = new Place({ id: placeId });
+      await place.fetchFields({
+        fields: ['displayName', 'formattedAddress', 'location', 'rating', 'userRatingCount',
+                 'websiteURI', 'googleMapsURI', 'regularOpeningHours', 'photos', 'types'],
+      });
+
+      const loc = place.location;
+      if (!loc) return;
+
+      const photos = place.photos || [];
+      let photoUrl = '';
+      if (photos.length > 0) {
+        try {
+          const uri = photos[0].getURI({ maxWidth: 400 });
+          if (uri) photoUrl = uri;
+        } catch { /* skip */ }
+      }
+
+      const preview: ImportPreview = {
+        name: place.displayName || '',
+        address: place.formattedAddress || '',
+        lat: loc.lat(),
+        lng: loc.lng(),
+        rating: (place as unknown as Record<string, number>).rating || 0,
+        reviewCount: place.userRatingCount || 0,
+        website: place.websiteURI || '',
+        googleMapsUrl: place.googleMapsURI || '',
+        hours: place.regularOpeningHours?.weekdayDescriptions || [],
+        photos: photoUrl ? [photoUrl] : [],
+        primaryType: place.types?.[0] || '',
+        status: 'new',
+      };
+
+      setSearchPreview(preview);
+      setSaveStatus('idle');
+    } catch (err) {
+      console.error('POI fetch failed:', err);
+    } finally {
+      setPoiLoading(false);
+    }
+  }, [poiLoading, saving, shops]);
+
   return (
     <>
       <Map
@@ -184,6 +247,14 @@ function MapInner({ shops, onSelect, openStatusMap, isAdmin, categoryMap, onImpo
         streetViewControl={false}
         fullscreenControl={false}
         style={{ width: '100%', height: '100%' }}
+        onClick={(e: MapMouseEvent) => {
+          const placeId = e.detail.placeId;
+          const latLng = e.detail.latLng;
+          if (isAdmin && placeId && latLng) {
+            e.stop();
+            handleClickPoi(placeId, latLng);
+          }
+        }}
       >
         {/* Existing shop markers */}
         {shops.map(shop => {

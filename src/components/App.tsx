@@ -6,6 +6,7 @@ import { ShopGrid } from './ShopGrid';
 import { ShopDetail } from './ShopDetail';
 import { TimeBar } from './TimeBar';
 import { UserMenu } from './UserMenu';
+import { AdminPanel } from './AdminPanel';
 import { ListDrawer } from './ListDrawer';
 import { ListTagBar } from './ListTagBar';
 import { ImportModal } from './ImportModal';
@@ -41,6 +42,7 @@ export function App() {
   const [mobileTab, setMobileTab] = useState<'explore' | 'map' | 'trip' | 'lists'>('explore');
   const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
   const [pendingInviteId, setPendingInviteId] = useState<string | null>(null);
+  const [adminPanelOpen, setAdminPanelOpen] = useState(false);
 
   // Data
   const [shops, setShops] = useState<Shop[]>([]);
@@ -428,7 +430,7 @@ export function App() {
                 + 匯入
               </button>
             )}
-            <UserMenu user={user} onSignIn={signInWithGoogle} onSignOut={signOut} onOpenLists={() => setDrawerOpen(true)} hasPublicLists={publicLists.length > 0} />
+            <UserMenu user={user} isAdmin={isAdmin} onSignIn={signInWithGoogle} onSignOut={signOut} onOpenLists={() => setDrawerOpen(true)} onOpenAdminPanel={() => setAdminPanelOpen(true)} hasPublicLists={publicLists.length > 0} />
           </div>
         </div>
       </header>
@@ -588,6 +590,14 @@ export function App() {
           categoryMap={categoryMap}
           onClose={() => setImportOpen(false)}
           onDone={handleImportDone}
+        />
+      )}
+
+      {/* Admin panel */}
+      {adminPanelOpen && user && (
+        <AdminPanel
+          currentUserId={user.id}
+          onClose={() => setAdminPanelOpen(false)}
         />
       )}
 
