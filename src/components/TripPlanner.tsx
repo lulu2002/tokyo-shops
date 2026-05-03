@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { APIProvider, Map as GoogleMap, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map as GoogleMap, AdvancedMarker, InfoWindow, useMap, type MapMouseEvent } from '@vis.gl/react-google-maps';
 import type { Shop } from '../types/shop';
 import type { TripStop } from '../types/trip';
 import { getOpenWindow } from '../utils/openWindow';
@@ -13,8 +13,9 @@ import { saveTripAsync, updateTripAsync, type SavedTrip } from '../lib/tripStora
 import { useTimeline } from '../hooks/useTimeline';
 import { useTripRealtime } from '../hooks/useTripRealtime';
 import { useTripPresence } from '../hooks/useTripPresence';
-import { fetchListShopIds } from '../lib/api';
+import { fetchListShopIds, fetchShops } from '../lib/api';
 import { fetchTripMembers, removeTripMember } from '../lib/tripCollabApi';
+import { classifyShops, saveImportedShops, type ImportPreview } from '../lib/importShops';
 import type { List } from '../types/list';
 import type { TripMember, TripRole } from '../types/trip';
 import type { User } from '@supabase/supabase-js';
@@ -44,7 +45,7 @@ interface Props {
   user?: User | null;
 }
 
-function TripMapInner({ shops, tripDate, onAddShop, onRemoveShop, selectedShopIds, editMode, orderedStops, userLoc, onLocate, activeShopId, onSetActiveShop }: {
+function TripMapInner({ shops, tripDate, onAddShop, onRemoveShop, selectedShopIds, editMode, orderedStops, userLoc, onLocate, activeShopId, onSetActiveShop, onClickPoi }: {
   shops: Shop[];
   tripDate: Date;
   onAddShop: (shop: Shop) => void;
@@ -56,6 +57,7 @@ function TripMapInner({ shops, tripDate, onAddShop, onRemoveShop, selectedShopId
   onLocate?: (loc: { lat: number; lng: number }) => void;
   activeShopId: number | null;
   onSetActiveShop: (shopId: number | null) => void;
+  onClickPoi?: (placeId: string, latLng: google.maps.LatLngLiteral) => void;
 }) {
   const map = useMap();
   const activeShop = shops.find(s => s.id === activeShopId) || null;
@@ -177,6 +179,14 @@ function TripMapInner({ shops, tripDate, onAddShop, onRemoveShop, selectedShopId
         fullscreenControl={false}
         mapTypeControl={false}
         style={{ width: '100%', height: '100%' }}
+        onClick={(e: MapMouseEvent) => {
+          const placeId = e.detail.placeId;
+          const latLng = e.detail.latLng;
+          if (editMode && placeId && latLng && onClickPoi) {
+            e.stop();
+            onClickPoi(placeId, latLng);
+          }
+        }}
       >
         {visibleShops.map((shop, _idx) => {
           if (!shop.lat || !shop.lng) return null;
@@ -452,6 +462,19 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
   const [importListOpen, setImportListOpen] = useState(false);
   const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [activeShopId, setActiveShopId] = useState<number | null>(null);
+  const [poiLoading, setPoiLoading] = useState(false);
+  const [poiPreview, setPoiPreview] = useState<{ name: string; lat: number; lng: number } | null>(null);
+  const [allShops, setAllShops] = useState(shops);
+
+  // Keep allShops in sync with parent + newly added
+  useEffect(() => {
+    setAllShops(prev => {
+      const parentIds = new Set(shops.map(s => s.id));
+      // Keep locally-added shops that aren't in parent yet
+      const localOnly = prev.filter(s => !parentIds.has(s.id));
+      return [...shops, ...localOnly];
+    });
+  }, [shops]);
 
   // When collaborative, use realtime data; otherwise local state
   const effectiveShopIds = collabEnabled ? rt.shopIds : orderedShopIds;
@@ -461,9 +484,9 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
   // Ordered shops for route drawing
   const orderedStops = useMemo(() => {
     return effectiveShopIds
-      .map(id => shops.find(s => s.id === id))
+      .map(id => allShops.find(s => s.id === id))
       .filter((s): s is Shop => s !== null && s !== undefined && !!s.lat && !!s.lng);
-  }, [effectiveShopIds, shops]);
+  }, [effectiveShopIds, allShops]);
 
   // Derived: selectedShopIds as Set for quick lookup
   const selectedShopIds = useMemo(() => new Set(effectiveShopIds), [effectiveShopIds]);
@@ -483,7 +506,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
   // Build trip stops with open window info (preserve order)
   const stops = useMemo((): TripStop[] => {
     return effectiveShopIds.map(id => {
-      const shop = shops.find(s => s.id === id);
+      const shop = allShops.find(s => s.id === id);
       if (!shop) return null;
 
       const result = getOpenWindow(shop.hours, tripDateJST);
@@ -532,7 +555,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
   // Handle duration change
   const handleDurationChange = useCallback((shopId: number, duration: number) => {
     if (collabEnabled) {
-      const shop = shops.find(s => s.id === shopId);
+      const shop = allShops.find(s => s.id === shopId);
       const defaultDur = shop?.visitDuration ?? 20;
       rt.updateDuration(shopId, duration === defaultDur ? null : duration);
     } else {
@@ -575,6 +598,108 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
     }
     setImportListOpen(false);
   }, [collabEnabled, effectiveShopIds, rt]);
+
+  // Build categoryMap for saving imported shops
+  const categoryMap = useMemo(() => new Map(categories.map(c => [c.name, c.id])), [categories]);
+
+  // Handle clicking a Google Maps POI → fetch place details → save to DB → add to trip
+  const handleClickPoi = useCallback(async (placeId: string, latLng: google.maps.LatLngLiteral) => {
+    if (poiLoading) return;
+    setPoiLoading(true);
+    setPoiPreview({ name: '載入中...', lat: latLng.lat, lng: latLng.lng });
+
+    try {
+      // Use Places API to get details
+      const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
+      const place = new Place({ id: placeId });
+      await place.fetchFields({
+        fields: ['displayName', 'formattedAddress', 'location', 'rating', 'userRatingCount',
+                 'websiteURI', 'googleMapsURI', 'regularOpeningHours', 'photos', 'types'],
+      });
+
+      const loc = place.location;
+      if (!loc) { setPoiPreview(null); return; }
+
+      const lat = loc.lat();
+      const lng = loc.lng();
+      const name = place.displayName || '';
+
+      // Check if this shop already exists (by location proximity)
+      const existing = allShops.find(s =>
+        s.lat && s.lng && Math.abs(s.lat - lat) < 0.0001 && Math.abs(s.lng - lng) < 0.0001
+      );
+
+      if (existing) {
+        // Already in DB — just add to trip
+        handleAddShop(existing);
+        setPoiPreview(null);
+        setPoiLoading(false);
+        return;
+      }
+
+      // Get photo URLs
+      const photos = place.photos || [];
+      const photoUrls: string[] = [];
+      for (const photo of photos.slice(0, 3)) {
+        try {
+          const uri = photo.getURI({ maxWidth: 400 });
+          if (uri) photoUrls.push(uri);
+        } catch { /* skip */ }
+      }
+
+      // Parse hours
+      let hours = place.regularOpeningHours?.weekdayDescriptions || [];
+      if (hours.length > 0 && hours[0].includes('曜日')) {
+        const dayMap: Record<string, string> = {
+          '月曜日': '週一', '火曜日': '週二', '水曜日': '週三', '木曜日': '週四',
+          '金曜日': '週五', '土曜日': '週六', '日曜日': '週日',
+        };
+        hours = hours.map(h => {
+          for (const [jp, zh] of Object.entries(dayMap)) h = h.replace(jp, zh);
+          h = h.replace('定休日', '公休').replace('24 時間営業', '24 小時營業');
+          h = h.replace(/(\d+)時(\d+)分/g, '$1:$2');
+          return h;
+        });
+      }
+
+      const preview: ImportPreview = {
+        name,
+        address: place.formattedAddress || '',
+        lat,
+        lng,
+        rating: (place as unknown as Record<string, number>).rating || 0,
+        reviewCount: place.userRatingCount || 0,
+        website: place.websiteURI || '',
+        googleMapsUrl: place.googleMapsURI || '',
+        hours,
+        photos: photoUrls,
+        primaryType: place.types?.[0] || '',
+        status: 'new',
+      };
+
+      setPoiPreview({ name, lat, lng });
+
+      // Classify with AI then save to DB
+      const [classified] = await classifyShops([preview]);
+      await saveImportedShops([classified], categoryMap);
+
+      // Re-fetch shops to get the new shop with its DB id
+      const freshShops = await fetchShops();
+      const newShop = freshShops.find(s =>
+        s.lat && s.lng && Math.abs(s.lat - lat) < 0.0001 && Math.abs(s.lng - lng) < 0.0001
+      );
+
+      if (newShop) {
+        setAllShops(prev => [...prev.filter(s => s.id !== newShop.id), newShop]);
+        handleAddShop(newShop);
+      }
+    } catch (err) {
+      console.error('POI add failed:', err);
+    } finally {
+      setPoiLoading(false);
+      setPoiPreview(null);
+    }
+  }, [poiLoading, allShops, handleAddShop, categoryMap]);
 
   const handleRemoveShop = useCallback((shopId: number) => {
     if (collabEnabled) {
@@ -1025,6 +1150,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
                 onLocate={loc => setUserLoc(loc)}
                 activeShopId={activeShopId}
                 onSetActiveShop={setActiveShopId}
+                onClickPoi={handleClickPoi}
               />
             </APIProvider>
           </div>
@@ -1210,6 +1336,16 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
             ) : null}
           </div>
         </MobileDrawer>
+
+        {/* POI loading indicator */}
+        {poiLoading && poiPreview && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20
+            px-4 py-2 bg-blue-600 text-white rounded-full shadow-lg text-sm font-medium
+            flex items-center gap-2">
+            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            正在加入 {poiPreview.name}...
+          </div>
+        )}
 
         {/* Mobile: toast when shop added */}
         {lastAdded && !trayOpen && (
