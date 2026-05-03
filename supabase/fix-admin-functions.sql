@@ -1,5 +1,8 @@
 -- Fix: rename return columns to avoid PL/pgSQL ambiguity
--- Just re-run these two functions (CREATE OR REPLACE)
+-- Must DROP first because return type changed
+
+drop function if exists search_users_by_email(text);
+drop function if exists list_admins();
 
 create or replace function search_users_by_email(search_email text)
 returns table (
