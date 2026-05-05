@@ -453,6 +453,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
   const [orderedShopIds, setOrderedShopIds] = useState<number[]>(loadTrip?.shopIds ?? []);
   const [visitedIds, setVisitedIds] = useState<Set<number>>(new Set(loadTrip?.visitedIds ?? []));
   const [trayOpen, setTrayOpen] = useState(!!loadTrip); // open tray by default when loading a saved trip
+  const [mobileReorderMode, setMobileReorderMode] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const resizingRef = useRef(false);
   const [suggesting, setSuggesting] = useState(false);
@@ -1281,10 +1282,12 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
         {/* Mobile: draggable bottom drawer */}
         <MobileDrawer
           open={trayOpen}
-          onClose={() => setTrayOpen(false)}
-          title={`已選 ${stops.length} 間${closedStops.length > 0 ? ` (${closedStops.length} 間公休)` : ''}`}
+          onClose={() => { setTrayOpen(false); setMobileReorderMode(false); }}
+          title={mobileReorderMode ? '拖拉排序' : `已選 ${stops.length} 間${closedStops.length > 0 ? ` (${closedStops.length} 間公休)` : ''}`}
+          reorderMode={mobileReorderMode}
+          onToggleReorder={editMode && canEdit ? () => setMobileReorderMode(v => !v) : undefined}
         >
-          {aiSummary && (
+          {aiSummary && !mobileReorderMode && (
             <div className="shrink-0 px-3 py-2 bg-indigo-50 border-y border-indigo-100 flex items-start gap-2">
               <span className="text-xs text-indigo-600 flex-1">{aiSummary}</span>
               <button onClick={() => { setAiSummary(''); setAiNotes(new Map()); }} className="text-xs text-indigo-400 shrink-0">✕</button>
@@ -1294,20 +1297,21 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
           <div className="flex-1 overflow-y-auto overscroll-contain">
             <TripStopList
               clusters={clusters}
-              closedStops={closedStops}
-              onRemove={editMode && canEdit ? handleRemoveShop : undefined}
-              onToggleVisited={handleToggleVisited}
+              closedStops={mobileReorderMode ? [] : closedStops}
+              onRemove={editMode && canEdit && !mobileReorderMode ? handleRemoveShop : undefined}
+              onToggleVisited={mobileReorderMode ? undefined : handleToggleVisited}
               onReorderClusters={editMode && canEdit ? handleReorderClusters : undefined}
               onReorderShopInCluster={editMode && canEdit ? handleReorderShopInCluster : undefined}
-              onDurationChange={editMode && canEdit ? handleDurationChange : undefined}
-              onSelectShop={handleSelectShop}
-              aiNotes={aiNotes}
+              onDurationChange={editMode && canEdit && !mobileReorderMode ? handleDurationChange : undefined}
+              onSelectShop={mobileReorderMode ? undefined : handleSelectShop}
+              aiNotes={mobileReorderMode ? undefined : aiNotes}
               shopDurations={effectiveShopDurations}
-              timeline={timeline}
+              timeline={mobileReorderMode ? undefined : timeline}
               stopDistances={!editMode ? stopDistances : undefined}
               totalStops={stops.length}
               hasTimeWindow={hasTimeWindow}
-              feasibility={feasibility}
+              feasibility={mobileReorderMode ? undefined : feasibility}
+              useMoveButtons={mobileReorderMode}
             />
           </div>
 
