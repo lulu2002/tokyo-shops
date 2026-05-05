@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { TripStop, StopTimeline } from '../types/trip';
 import { estimateWalkMinutes } from '../utils/distance';
 
-const DURATION_OPTIONS = [0, 15, 30, 45, 60, 90, 120];
+const DURATION_OPTIONS = [0, 15, 30, 45, 60, 90, 120, 180, 240, 300, 360];
 
 interface Props {
   stop: TripStop;
@@ -53,7 +53,7 @@ export function TripStopRow({ stop, onRemove, onToggleVisited, onDurationChange,
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
               {shop.subcategory && <span>{shop.subcategory}</span>}
               {!onRemove && currentDuration > 0 && (
-                <span className="text-gray-400">· 停留 {currentDuration} 分</span>
+                <span className="text-gray-400">· 停留 {currentDuration >= 60 ? `${currentDuration / 60} 小時` : `${currentDuration} 分`}</span>
               )}
               {distance !== undefined && distance < 5000 && (
                 <span className="text-blue-500">· 步行 {estimateWalkMinutes(distance)} 分</span>
@@ -69,7 +69,7 @@ export function TripStopRow({ stop, onRemove, onToggleVisited, onDurationChange,
               onClick={() => setDurationOpen(v => !v)}
               className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 font-mono"
             >
-              {currentDuration === 0 ? '跳過' : `${currentDuration}分`}
+              {currentDuration === 0 ? '跳過' : currentDuration >= 60 ? `${currentDuration / 60}h` : `${currentDuration}分`}
             </button>
             {durationOpen && (
               <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-20 overflow-hidden">
@@ -79,7 +79,7 @@ export function TripStopRow({ stop, onRemove, onToggleVisited, onDurationChange,
                     onClick={() => { onDurationChange(d); setDurationOpen(false); }}
                     className={`block w-full px-3 py-1.5 text-xs text-left hover:bg-gray-50 ${d === currentDuration ? 'text-blue-600 font-semibold' : 'text-gray-600'}`}
                   >
-                    {d === 0 ? '跳過（不佔時間）' : `${d} 分`}
+                    {d === 0 ? '跳過（不佔時間）' : d >= 60 ? `${d / 60} 小時` : `${d} 分`}
                   </button>
                 ))}
               </div>
