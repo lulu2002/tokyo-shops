@@ -171,93 +171,41 @@ export function TripStopList({ clusters, closedStops, onRemove, onToggleVisited,
         <SortableContext items={clusters.map(c => c.id)} strategy={verticalListSortingStrategy}>
           {clusters.map((cluster, i) => (
             <div key={cluster.id}>
-              {useMoveButtons ? (
-                // Move-button mode for cluster header
+              <SortableCluster id={cluster.id}>
                 <div className="px-3 py-1.5 bg-gray-50 text-xs font-medium text-gray-500 flex items-center gap-1">
-                  <div className="shrink-0 flex gap-1 mr-1">
-                    <button
-                      onClick={() => { if (i > 0 && onReorderClusters) onReorderClusters(i, i - 1); }}
-                      disabled={i === 0}
-                      className="w-7 h-7 flex items-center justify-center rounded text-gray-400 disabled:opacity-20 active:bg-blue-50 active:text-blue-600 text-sm"
-                    >▲</button>
-                    <button
-                      onClick={() => { if (i < clusters.length - 1 && onReorderClusters) onReorderClusters(i, i + 1); }}
-                      disabled={i === clusters.length - 1}
-                      className="w-7 h-7 flex items-center justify-center rounded text-gray-400 disabled:opacity-20 active:bg-blue-50 active:text-blue-600 text-sm"
-                    >▼</button>
-                  </div>
+                  <span className="text-gray-300 mr-1">⠿</span>
                   <span>📍</span>
                   <span>{cluster.name}</span>
                   <span className="text-gray-300">({cluster.stops.length} 間)</span>
+                  {!useMoveButtons && timeline?.clusterTimelines.get(cluster.id) && (
+                    <span className="ml-auto text-gray-400">
+                      {timeline.clusterTimelines.get(cluster.id)!.arrivalStr}-{timeline.clusterTimelines.get(cluster.id)!.departureStr}
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <SortableCluster id={cluster.id}>
-                  {/* Cluster header — drag handle */}
-                  <div className="px-3 py-1.5 bg-gray-50 text-xs font-medium text-gray-500 flex items-center gap-1">
-                    <span className="text-gray-300 mr-1">⠿</span>
-                    <span>📍</span>
-                    <span>{cluster.name}</span>
-                    <span className="text-gray-300">({cluster.stops.length} 間)</span>
-                    {timeline?.clusterTimelines.get(cluster.id) && (
-                      <span className="ml-auto text-gray-400">
-                        {timeline.clusterTimelines.get(cluster.id)!.arrivalStr}-{timeline.clusterTimelines.get(cluster.id)!.departureStr}
-                      </span>
-                    )}
-                  </div>
-                </SortableCluster>
-              )}
+              </SortableCluster>
 
               {/* Shops within cluster */}
-              {useMoveButtons ? (
-                // Move-button mode (mobile reorder)
-                cluster.stops.map((stop, j) => (
-                  <div key={stop.shop.id} className="flex items-center border-b border-gray-50">
-                    <div className="shrink-0 flex flex-col">
-                      <button
-                        onClick={() => {
-                          if (j > 0 && onReorderShopInCluster) onReorderShopInCluster(i, j, j - 1);
-                        }}
-                        disabled={j === 0}
-                        className="w-10 h-8 flex items-center justify-center text-gray-400 disabled:opacity-20 active:bg-blue-50 active:text-blue-600 text-base"
-                      >▲</button>
-                      <button
-                        onClick={() => {
-                          if (j < cluster.stops.length - 1 && onReorderShopInCluster) onReorderShopInCluster(i, j, j + 1);
-                        }}
-                        disabled={j === cluster.stops.length - 1}
-                        className="w-10 h-8 flex items-center justify-center text-gray-400 disabled:opacity-20 active:bg-blue-50 active:text-blue-600 text-base"
-                      >▼</button>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <TripStopRow
-                        stop={stop}
-                        duration={shopDurations?.get(stop.shop.id)}
-                      />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                // Drag mode (desktop)
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={makeShopDragHandler(i)}>
-                  <SortableContext items={cluster.stops.map(s => `shop-${s.shop.id}`)} strategy={verticalListSortingStrategy}>
-                    {cluster.stops.map(stop => (
-                      <SortableShopRow
-                        key={stop.shop.id}
-                        stop={stop}
-                        onRemove={onRemove ? () => onRemove(stop.shop.id) : undefined}
-                        onToggleVisited={onToggleVisited ? () => onToggleVisited(stop.shop.id) : undefined}
-                        onDurationChange={onDurationChange ? (d: number) => onDurationChange(stop.shop.id, d) : undefined}
-                        onSelect={onSelectShop ? () => onSelectShop(stop.shop.id) : undefined}
-                        aiNote={aiNotes?.get(stop.shop.id)}
-                        duration={shopDurations?.get(stop.shop.id)}
-                        stopTimeline={timeline?.stopTimelines.get(stop.shop.id)}
-                        distance={stopDistances?.get(stop.shop.id)}
-                        draggable={!!onReorderShopInCluster}
-                      />
-                    ))}
-                  </SortableContext>
-                </DndContext>
-              )}
+              {/* Shops within cluster — drag to reorder */}
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={makeShopDragHandler(i)}>
+                <SortableContext items={cluster.stops.map(s => `shop-${s.shop.id}`)} strategy={verticalListSortingStrategy}>
+                  {cluster.stops.map(stop => (
+                    <SortableShopRow
+                      key={stop.shop.id}
+                      stop={stop}
+                      onRemove={useMoveButtons ? undefined : (onRemove ? () => onRemove(stop.shop.id) : undefined)}
+                      onToggleVisited={useMoveButtons ? undefined : (onToggleVisited ? () => onToggleVisited(stop.shop.id) : undefined)}
+                      onDurationChange={useMoveButtons ? undefined : (onDurationChange ? (d: number) => onDurationChange(stop.shop.id, d) : undefined)}
+                      onSelect={useMoveButtons ? undefined : (onSelectShop ? () => onSelectShop(stop.shop.id) : undefined)}
+                      aiNote={useMoveButtons ? undefined : aiNotes?.get(stop.shop.id)}
+                      duration={shopDurations?.get(stop.shop.id)}
+                      stopTimeline={useMoveButtons ? undefined : timeline?.stopTimelines.get(stop.shop.id)}
+                      distance={useMoveButtons ? undefined : stopDistances?.get(stop.shop.id)}
+                      draggable={!!onReorderShopInCluster}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
 
               {/* Inter-cluster walk time */}
               {i < clusters.length - 1 && (
