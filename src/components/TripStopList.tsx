@@ -62,7 +62,7 @@ function SortableCluster({ id, children }: { id: string; children: React.ReactNo
 }
 
 // Sortable wrapper for a shop row
-function SortableShopRow({ stop, onRemove, onToggleVisited, onDurationChange, onSelect, aiNote, duration, stopTimeline, distance, draggable }: {
+function SortableShopRow({ stop, onRemove, onToggleVisited, onDurationChange, onSelect, aiNote, duration, stopTimeline, distance, draggable, fullRowDrag }: {
   stop: TripStop;
   onRemove?: () => void;
   onToggleVisited?: () => void;
@@ -73,6 +73,8 @@ function SortableShopRow({ stop, onRemove, onToggleVisited, onDurationChange, on
   stopTimeline?: StopTimeline;
   distance?: number;
   draggable?: boolean;
+  /** Make entire row the drag handle (for mobile reorder mode) */
+  fullRowDrag?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `shop-${stop.shop.id}`,
@@ -84,12 +86,23 @@ function SortableShopRow({ stop, onRemove, onToggleVisited, onDurationChange, on
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // In fullRowDrag mode, the entire row is the drag handle
+  const rowDragProps = fullRowDrag ? { ...attributes, ...listeners } : {};
+
   return (
     <div ref={setNodeRef} style={style}>
-      <div className="flex items-center">
-        {/* Drag handle — only in edit mode */}
+      <div
+        className={`flex items-center ${fullRowDrag ? 'cursor-grab active:cursor-grabbing active:bg-blue-50 touch-none select-none' : ''}`}
+        {...rowDragProps}
+      >
+        {/* Drag handle icon */}
         {draggable && (
-          <div {...attributes} {...listeners} className="shrink-0 px-1 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 select-none">
+          <div
+            {...(fullRowDrag ? {} : { ...attributes, ...listeners })}
+            className={`shrink-0 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 select-none touch-none ${
+              fullRowDrag ? 'pl-3 pr-2 py-3 text-base' : 'px-1'
+            }`}
+          >
             ⠿
           </div>
         )}
@@ -202,6 +215,7 @@ export function TripStopList({ clusters, closedStops, onRemove, onToggleVisited,
                       stopTimeline={useMoveButtons ? undefined : timeline?.stopTimelines.get(stop.shop.id)}
                       distance={useMoveButtons ? undefined : stopDistances?.get(stop.shop.id)}
                       draggable={!!onReorderShopInCluster}
+                      fullRowDrag={useMoveButtons}
                     />
                   ))}
                 </SortableContext>
