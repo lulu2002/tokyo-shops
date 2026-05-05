@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   fetchTripShopItems,
@@ -116,14 +116,14 @@ export function useTripRealtime(tripId: string | null, enabled: boolean): UseTri
     };
   }, [tripId, enabled]);
 
-  // Derived values
-  const shopIds = shopItems.map(i => i.shopId);
-  const visitedIds = new Set(shopItems.filter(i => i.visited).map(i => i.shopId));
-  const shopDurations = new Map(
+  // Derived values — stabilized with useMemo to avoid re-renders causing effect re-runs
+  const shopIds = useMemo(() => shopItems.map(i => i.shopId), [shopItems]);
+  const visitedIds = useMemo(() => new Set(shopItems.filter(i => i.visited).map(i => i.shopId)), [shopItems]);
+  const shopDurations = useMemo(() => new Map(
     shopItems
       .filter(i => i.durationOverride !== null)
       .map(i => [i.shopId, i.durationOverride!])
-  );
+  ), [shopItems]);
 
   const addShop = useCallback(async (shopId: number) => {
     if (!tripId) return;

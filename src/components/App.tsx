@@ -513,7 +513,7 @@ export function App() {
       </div>
 
       {/* Mobile trip tab: planner (stays mounted, hidden via display) */}
-      <div className="sm:!hidden" style={{ display: isMobileTrip && tripOpen ? '' : 'none' }}>
+      <div className="sm:!hidden overflow-hidden" style={{ display: isMobileTrip && tripOpen ? '' : 'none' }}>
         <TripPlanner
           key={`mobile-${tripLoadData?.id ?? 'new'}`}
           shops={shops}

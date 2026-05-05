@@ -69,20 +69,30 @@ function TripMapInner({ shops, tripDate, onAddShop, onRemoveShop, selectedShopId
     if (map.getZoom()! < 14) map.setZoom(15);
   }, [map, activeShop]);
 
-  // In view mode: fit bounds to selected shops
+  // In view mode: fit bounds to selected shops (only on mode switch, not on every data change)
+  const stopsKey = orderedStops.map(s => s.id).join(',');
+  const prevStopsKeyRef = useRef(stopsKey);
+  const prevEditModeRef = useRef(editMode);
+
   useEffect(() => {
     if (!map) return;
-    if (!editMode && orderedStops.length > 0) {
+    // Only fit bounds when switching to view mode, or when stops change significantly
+    const modeChanged = prevEditModeRef.current !== editMode;
+    const stopsChanged = prevStopsKeyRef.current !== stopsKey;
+    prevEditModeRef.current = editMode;
+    prevStopsKeyRef.current = stopsKey;
+
+    if (!editMode && orderedStops.length > 0 && (modeChanged || stopsChanged)) {
       const bounds = new google.maps.LatLngBounds();
       for (const s of orderedStops) {
         if (s.lat && s.lng) bounds.extend({ lat: s.lat, lng: s.lng });
       }
       map.fitBounds(bounds, { top: 60, bottom: 40, left: 40, right: 40 });
-    } else if (orderedStops.length === 0) {
+    } else if (orderedStops.length === 0 && stopsChanged) {
       map.setCenter({ lat: 35.6762, lng: 139.6503 });
       map.setZoom(12);
     }
-  }, [map, editMode, orderedStops]);
+  }, [map, editMode, stopsKey, orderedStops]);
 
   // Draw route via Routes API (New) with fallback to straight lines
   useEffect(() => {
@@ -161,7 +171,8 @@ function TripMapInner({ shops, tripDate, onAddShop, onRemoveShop, selectedShopId
       cancelled = true;
       polyline?.setMap(null);
     };
-  }, [map, orderedStops]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, stopsKey]);
 
   // Which shops to show on map
   const visibleShops = editMode ? shops : shops.filter(s => selectedShopIds.has(s.id));
@@ -944,7 +955,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
 
   return (
     <div className={inline
-      ? 'flex flex-col bg-white'
+      ? 'flex flex-col bg-white overflow-hidden overscroll-none'
       : 'fixed inset-0 bottom-0 z-40 bg-white flex flex-col'
     } style={inline ? { height: 'calc(100dvh - 56px)' } : undefined}>
       {/* Header bar */}
