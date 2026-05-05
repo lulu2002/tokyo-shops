@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -109,7 +109,20 @@ function SortableShopRow({ stop, onRemove, onToggleVisited, onDurationChange, on
   );
 }
 
+// Check if mobile (used to switch drag vs button reorder)
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
+
 export function TripStopList({ clusters, closedStops, onRemove, onToggleVisited, onReorderClusters, onReorderShopInCluster, onDurationChange, onSelectShop, aiNotes, shopDurations, timeline, stopDistances, totalStops, hasTimeWindow, feasibility }: Props) {
+  const isMobile = useIsMobile();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
@@ -164,32 +177,57 @@ export function TripStopList({ clusters, closedStops, onRemove, onToggleVisited,
         </div>
       )}
 
-      {/* Clusters — draggable to reorder */}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleClusterDragEnd}>
-        <SortableContext items={clusters.map(c => c.id)} strategy={verticalListSortingStrategy}>
+      {/* Clusters */}
+      {isMobile ? (
+        /* Mobile: button-based reorder */
+        <>
           {clusters.map((cluster, i) => (
             <div key={cluster.id}>
-              <SortableCluster id={cluster.id}>
-                {/* Cluster header — this is the drag handle for cluster */}
-                <div className="px-3 py-1.5 bg-gray-50 text-xs font-medium text-gray-500 flex items-center gap-1">
-                  <span className="text-gray-300 mr-1">⠿</span>
-                  <span>📍</span>
-                  <span>{cluster.name}</span>
-                  <span className="text-gray-300">({cluster.stops.length} 間)</span>
-                  {timeline?.clusterTimelines.get(cluster.id) && (
-                    <span className="ml-auto text-gray-400">
-                      {timeline.clusterTimelines.get(cluster.id)!.arrivalStr}-{timeline.clusterTimelines.get(cluster.id)!.departureStr}
-                    </span>
-                  )}
-                </div>
-              </SortableCluster>
+              {/* Cluster header with move buttons */}
+              <div className="px-3 py-1.5 bg-gray-50 text-xs font-medium text-gray-500 flex items-center gap-1">
+                {onReorderClusters && clusters.length > 1 && (
+                  <div className="flex flex-col mr-1 shrink-0">
+                    <button
+                      onClick={() => i > 0 && onReorderClusters(i, i - 1)}
+                      disabled={i === 0}
+                      className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-[10px]"
+                    >▲</button>
+                    <button
+                      onClick={() => i < clusters.length - 1 && onReorderClusters(i, i + 1)}
+                      disabled={i === clusters.length - 1}
+                      className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-[10px]"
+                    >▼</button>
+                  </div>
+                )}
+                <span>📍</span>
+                <span>{cluster.name}</span>
+                <span className="text-gray-300">({cluster.stops.length} 間)</span>
+                {timeline?.clusterTimelines.get(cluster.id) && (
+                  <span className="ml-auto text-gray-400">
+                    {timeline.clusterTimelines.get(cluster.id)!.arrivalStr}-{timeline.clusterTimelines.get(cluster.id)!.departureStr}
+                  </span>
+                )}
+              </div>
 
-              {/* Shops within cluster — separate drag context */}
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={makeShopDragHandler(i)}>
-                <SortableContext items={cluster.stops.map(s => `shop-${s.shop.id}`)} strategy={verticalListSortingStrategy}>
-                  {cluster.stops.map(stop => (
-                    <SortableShopRow
-                      key={stop.shop.id}
+              {/* Shops with move buttons */}
+              {cluster.stops.map((stop, j) => (
+                <div key={stop.shop.id} className="flex items-center">
+                  {onReorderShopInCluster && cluster.stops.length > 1 && (
+                    <div className="flex flex-col pl-2 shrink-0">
+                      <button
+                        onClick={() => j > 0 && onReorderShopInCluster(i, j, j - 1)}
+                        disabled={j === 0}
+                        className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-[10px] py-0.5"
+                      >▲</button>
+                      <button
+                        onClick={() => j < cluster.stops.length - 1 && onReorderShopInCluster(i, j, j + 1)}
+                        disabled={j === cluster.stops.length - 1}
+                        className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-[10px] py-0.5"
+                      >▼</button>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <TripStopRow
                       stop={stop}
                       onRemove={onRemove ? () => onRemove(stop.shop.id) : undefined}
                       onToggleVisited={onToggleVisited ? () => onToggleVisited(stop.shop.id) : undefined}
@@ -199,11 +237,10 @@ export function TripStopList({ clusters, closedStops, onRemove, onToggleVisited,
                       duration={shopDurations?.get(stop.shop.id)}
                       stopTimeline={timeline?.stopTimelines.get(stop.shop.id)}
                       distance={stopDistances?.get(stop.shop.id)}
-                      draggable={!!onReorderShopInCluster}
                     />
-                  ))}
-                </SortableContext>
-              </DndContext>
+                  </div>
+                </div>
+              ))}
 
               {/* Inter-cluster walk time */}
               {i < clusters.length - 1 && (
@@ -215,8 +252,59 @@ export function TripStopList({ clusters, closedStops, onRemove, onToggleVisited,
               )}
             </div>
           ))}
-        </SortableContext>
-      </DndContext>
+        </>
+      ) : (
+        /* Desktop: drag-based reorder */
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleClusterDragEnd}>
+          <SortableContext items={clusters.map(c => c.id)} strategy={verticalListSortingStrategy}>
+            {clusters.map((cluster, i) => (
+              <div key={cluster.id}>
+                <SortableCluster id={cluster.id}>
+                  <div className="px-3 py-1.5 bg-gray-50 text-xs font-medium text-gray-500 flex items-center gap-1">
+                    <span className="text-gray-300 mr-1">⠿</span>
+                    <span>📍</span>
+                    <span>{cluster.name}</span>
+                    <span className="text-gray-300">({cluster.stops.length} 間)</span>
+                    {timeline?.clusterTimelines.get(cluster.id) && (
+                      <span className="ml-auto text-gray-400">
+                        {timeline.clusterTimelines.get(cluster.id)!.arrivalStr}-{timeline.clusterTimelines.get(cluster.id)!.departureStr}
+                      </span>
+                    )}
+                  </div>
+                </SortableCluster>
+
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={makeShopDragHandler(i)}>
+                  <SortableContext items={cluster.stops.map(s => `shop-${s.shop.id}`)} strategy={verticalListSortingStrategy}>
+                    {cluster.stops.map(stop => (
+                      <SortableShopRow
+                        key={stop.shop.id}
+                        stop={stop}
+                        onRemove={onRemove ? () => onRemove(stop.shop.id) : undefined}
+                        onToggleVisited={onToggleVisited ? () => onToggleVisited(stop.shop.id) : undefined}
+                        onDurationChange={onDurationChange ? (d: number) => onDurationChange(stop.shop.id, d) : undefined}
+                        onSelect={onSelectShop ? () => onSelectShop(stop.shop.id) : undefined}
+                        aiNote={aiNotes?.get(stop.shop.id)}
+                        duration={shopDurations?.get(stop.shop.id)}
+                        stopTimeline={timeline?.stopTimelines.get(stop.shop.id)}
+                        distance={stopDistances?.get(stop.shop.id)}
+                        draggable={!!onReorderShopInCluster}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+
+                {i < clusters.length - 1 && (
+                  <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-gray-400">
+                    <div className="flex-1 border-t border-dashed border-gray-200" />
+                    <span>🚶 步行 {interClusterWalkMinutes(cluster, clusters[i + 1])} 分</span>
+                    <div className="flex-1 border-t border-dashed border-gray-200" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </SortableContext>
+        </DndContext>
+      )}
 
       {/* Closed stops section */}
       {closedStops.length > 0 && (
