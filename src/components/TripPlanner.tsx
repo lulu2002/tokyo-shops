@@ -69,36 +69,34 @@ function TripMapInner({ shops, tripDate, onAddShop, onRemoveShop, selectedShopId
     if (map.getZoom()! < 14) map.setZoom(15);
   }, [map, activeShop]);
 
-  // In view mode: fit bounds to selected shops (only on mode switch, not on every data change)
+  // Stable key for ordered stops — only changes when shop IDs or order actually change
   const stopsKey = orderedStops.map(s => s.id).join(',');
-  const prevStopsKeyRef = useRef(stopsKey);
-  const prevEditModeRef = useRef(editMode);
+  // Keep a ref to the latest orderedStops so effects can read current data without depending on the reference
+  const orderedStopsRef = useRef(orderedStops);
+  orderedStopsRef.current = orderedStops;
 
+  // In view mode: fit bounds to selected shops (only on mode switch or stops change)
   useEffect(() => {
     if (!map) return;
-    // Only fit bounds when switching to view mode, or when stops change significantly
-    const modeChanged = prevEditModeRef.current !== editMode;
-    const stopsChanged = prevStopsKeyRef.current !== stopsKey;
-    prevEditModeRef.current = editMode;
-    prevStopsKeyRef.current = stopsKey;
-
-    if (!editMode && orderedStops.length > 0 && (modeChanged || stopsChanged)) {
+    const stops = orderedStopsRef.current;
+    if (!editMode && stops.length > 0) {
       const bounds = new google.maps.LatLngBounds();
-      for (const s of orderedStops) {
+      for (const s of stops) {
         if (s.lat && s.lng) bounds.extend({ lat: s.lat, lng: s.lng });
       }
       map.fitBounds(bounds, { top: 60, bottom: 40, left: 40, right: 40 });
-    } else if (orderedStops.length === 0 && stopsChanged) {
+    } else if (stops.length === 0) {
       map.setCenter({ lat: 35.6762, lng: 139.6503 });
       map.setZoom(12);
     }
-  }, [map, editMode, stopsKey, orderedStops]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, editMode, stopsKey]);
 
   // Draw route via Routes API (New) with fallback to straight lines
   useEffect(() => {
     if (!map) return;
 
-    const points = orderedStops
+    const points = orderedStopsRef.current
       .filter(s => s.lat && s.lng)
       .map(s => ({ lat: s.lat, lng: s.lng }));
 
