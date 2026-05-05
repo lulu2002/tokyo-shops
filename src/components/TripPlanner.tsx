@@ -944,7 +944,7 @@ export function TripPlanner({ shops, categories, lists, onClose, loadTrip, inlin
 
   return (
     <div className={inline
-      ? 'flex flex-col bg-white'
+      ? 'flex flex-col bg-white overflow-hidden overscroll-none'
       : 'fixed inset-0 bottom-0 z-40 bg-white flex flex-col'
     } style={inline ? { height: 'calc(100dvh - 56px)' } : undefined}>
       {/* Header bar */}
