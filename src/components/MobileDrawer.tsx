@@ -46,7 +46,7 @@ export function MobileDrawer({ open, onClose, title, children, reorderMode, onTo
     <div className="sm:hidden absolute inset-x-0 bottom-0 z-20">
       <div
         className="bg-white rounded-t-2xl shadow-2xl border-t border-gray-200 flex flex-col transition-[height] duration-300 ease-out"
-        style={{ height: heightPct > 0 ? `${heightPct}vh` : '0vh' }}
+        style={{ height: heightPct > 0 ? `${heightPct}vh` : '0vh', maxHeight: '100%' }}
       >
         {/* Header */}
         <div className="shrink-0 px-3 py-2.5 flex items-center gap-2 border-b border-gray-100">
