@@ -43,12 +43,12 @@ export function MobileDrawer({ open, onClose, title, children, reorderMode, onTo
   if (!visible) return null;
 
   return (
-    <div className="sm:hidden absolute inset-x-0 bottom-0 z-20">
+    <div className="sm:hidden absolute inset-0 z-20 pointer-events-none">
       <div
-        className="bg-white rounded-t-2xl shadow-2xl border-t border-gray-200 flex flex-col transition-[height] duration-300 ease-out"
+        className="bg-white rounded-t-2xl shadow-2xl border-t border-gray-200 flex flex-col transition-[height] duration-300 ease-out pointer-events-auto absolute inset-x-0 bottom-0"
         style={{
           height: heightPct > 0 ? `${heightPct}vh` : '0vh',
-          maxHeight: 'calc(100dvh - 110px)', // header (~55px) + bottom nav (~55px)
+          maxHeight: '100%',
         }}
       >
         {/* Header */}
