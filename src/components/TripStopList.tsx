@@ -99,8 +99,8 @@ function SortableShopRow({ stop, onRemove, onToggleVisited, onDurationChange, on
         {draggable && (
           <div
             {...(fullRowDrag ? {} : { ...attributes, ...listeners })}
-            className={`shrink-0 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 select-none touch-none ${
-              fullRowDrag ? 'pl-3 pr-2 py-3 text-base' : 'px-1'
+            className={`shrink-0 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 select-none ${
+              fullRowDrag ? 'pl-3 pr-2 py-3 text-base touch-none' : 'px-1'
             }`}
           >
             ⠿
