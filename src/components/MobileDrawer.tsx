@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 const SNAP_PEEK = 40;
-const SNAP_FULL = 90;
+// 90 is handled specially — see maxHeight below
 
 interface Props {
   open: boolean;
@@ -16,7 +16,7 @@ interface Props {
 export function MobileDrawer({ open, onClose, title, children, reorderMode, onToggleReorder }: Props) {
   const [heightPct, setHeightPct] = useState(0);
   const [visible, setVisible] = useState(false);
-  const isFull = heightPct >= SNAP_FULL;
+  const isFull = heightPct >= 90;
 
   // Animate open/close
   useEffect(() => {
@@ -33,7 +33,7 @@ export function MobileDrawer({ open, onClose, title, children, reorderMode, onTo
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSize = useCallback(() => {
-    setHeightPct(prev => prev >= SNAP_FULL ? SNAP_PEEK : SNAP_FULL);
+    setHeightPct(prev => prev >= 90 ? SNAP_PEEK : 90);
   }, []);
 
   const handleClose = useCallback(() => {
@@ -46,7 +46,10 @@ export function MobileDrawer({ open, onClose, title, children, reorderMode, onTo
     <div className="sm:hidden absolute inset-x-0 bottom-0 z-20">
       <div
         className="bg-white rounded-t-2xl shadow-2xl border-t border-gray-200 flex flex-col transition-[height] duration-300 ease-out"
-        style={{ height: heightPct > 0 ? `${heightPct}vh` : '0vh', maxHeight: '100%' }}
+        style={{
+          height: heightPct > 0 ? `${heightPct}vh` : '0vh',
+          maxHeight: 'calc(100dvh - 110px)', // header (~55px) + bottom nav (~55px)
+        }}
       >
         {/* Header */}
         <div className="shrink-0 px-3 py-2.5 flex items-center gap-2 border-b border-gray-100">
